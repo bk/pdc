@@ -3,9 +3,6 @@
 # pandoc, as well as 'pdf' (meaning latex with pdf conversion)
 #
 formats: ['pdf', 'latex', 'html5']
-# Whether to run preprocessor. This is a global setting which does not
-# make sense for individual formats.
-gpp: false
 # If true, creates dir for all output ($filename.pdc/).
 # If false, names output files $filename.$ext in same dir as $filename.
 outputdir: true
@@ -25,7 +22,6 @@ include: ''
 # format uses general-latex and format-latex overrides.
 #
 general:
-    gpp-define: ['FALLBACK']
     # READER options:
     parse-raw: false
     smart: true
@@ -77,7 +73,6 @@ general:
     csl: ''
     bibliography: ''
 general-html:
-    gpp-define: ['HTML']
     self-contained: false
     html-q-tags: false
     ascii: false
@@ -115,7 +110,6 @@ format-odt:
 format-docx:
     reference-docx: ''
 general-latex:
-    gpp-define: ['TEX']
     # If true, generate pdf in a separate step. Also makes it possible
     # to generate pdf for beamer but not normal latex output, and without
     # specifying 'pdf' in top-level formats.

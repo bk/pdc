@@ -63,7 +63,7 @@ foreach my $format (@{ $conf->{formats} }) {
     my @cmds = get_command($format, $mdfile, $conf);
     foreach my $cmd (@cmds) {
         if (ref $cmd eq 'CODE') {
-            print "[CLEANUP $format]\n";
+            print "[CLEANUP/PREP $format]\n";
             $cmd->();
         }
         elsif (ref $cmd eq 'ARRAY') {
@@ -87,7 +87,7 @@ sub get_command {
     my @pre_cmd = ();
     my $core_cmd = ['pandoc', '-f', 'markdown'];
     my @post_cmd = ();
-    # TODO: Ignoring GPP for now; affects @pre_cmd, @post_cmd.
+    # TODO: Preprocessor support; will affect @pre_cmd, @post_cmd.
     if ($format eq 'pdf') {
         push @$core_cmd, "-t", "latex";
     } else {
