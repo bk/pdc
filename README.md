@@ -43,9 +43,9 @@ pdc:
 
 Note that `format-latex` affects the PDF format, since the latter is simply a LaTeX document compiled to PDF.
 
-Now, let's say Karl and Friedrich collaborate on this document through a shared Github repository, but it is tedious for Friedrich to be constantly changing the `pdc` section of the file in his working directory to point to the correct cover image. Also, he would like to add a version of the manifesto to his blog and is not really interested in the pdf or docx versions. 
+Now, let's suppose that Karl and Friedrich collaborate on this document through a shared Github repository, but it is tedious for Friedrich to be constantly changing the `pdc` section of the file in his working directory to point to the correct cover image. Also, he would like to add a version of the manifesto to his blog (where he uses a different citation style) and is not really interested in the PDF or Word formats.
 
-The solution in such a case is to use the `include` option:
+The solution in such a case is to change the `pdc` section so as to use the `include` option:
 
 ```yaml
 ---
@@ -55,7 +55,7 @@ author:
     - Friedrich Engels
 date: 1848-02-21
 lang: en-GB
-bibliography: /home/km/bib/manifesto.bib
+bibliography: manifesto.bib
 csl: chicago-author-date.csl
 pdc:
     include: manifesto.yaml
@@ -72,17 +72,18 @@ format-epub:
     epub-cover-image: '/home/km/img/spectre_big.jpg'
 ```
 
-as we saw above, while Engels's version of this file will look like this:
+as we saw above, while Engels's version of this file perhaps might look like this:
 
 ```yaml
 formats: ['html5', 'epub']
 format-html5:
     template: engels_blog.html5
+    csl: 'turabian-fullnote-bibliography.csl'
 format-epub:
     epub-cover-image: '/Users/engels/Pictures/spectre_big.jpg'
 ```
 
-Read `defaults.yaml` for further information on the supported conversion settings.
+Take a look at `defaults.yaml` for further information on the supported conversion settings. Most settings map directly on to `pandoc` command line options, while the rest is explained using comments.
 
 ## Planned features
 
