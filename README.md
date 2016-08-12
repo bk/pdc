@@ -99,10 +99,40 @@ Take a look at `defaults.yaml` for further information on the supported conversi
 
 -  `-n TARGETNAME` or `--target-name=TARGETNAME`: Overrides the basename of the target file(s), which by default is the same as the name of the first source file specified. This is mostly useful when there are multiple source files, e.g. `pdc -n book ch1.md ch2.md ch3.md`. Note that if `output-dir` is `auto`, this also affects the name of the output directory; in the above example, the export files would therefore be placed in the directory `book.pdc`.
 
-## Planned features
+## Automatically preprocessing source files
 
-- Configurable post-processing of target files by running a shell script or other external command on them.
-- Integrated preprocessor support using e.g. [m4](https://www.gnu.org/software/m4/manual/index.html) or [gpp](https://logological.org/gpp). An interesting blog entry describing the advantages of using gpp with pandoc can be found [here](https://randomdeterminism.wordpress.com/2012/06/01/how-i-stopped-worring-and-started-using-markdown-like-tex/).
+It is possible to tell `pdc` to run the markdown files through a preprocessor before converting them. In order to do this, you set the key `preprocessor-command` in your settings, either at the top level or for a specific format. In the main, however, you would wish to turn this on globally for all output formats, since it relates to the source files. On the other hand, `preprocessor-args` would often be different for different outputs, since you would commonly wish to include or exclude specific sections of your document based on the output format.
+
+The command specified in `preprocessor-command` must read from standard input and write to standard output.
+
+If one uses [m4](https://www.gnu.org/software/m4/manual/index.html), the preprocessing settings might look like this:
+
+```yaml
+preprocessor-command: 'm4 -P ~/.config/pdc/macros.m4 -'
+general:
+    preprocessor-args: '-DFALLBACK'
+format-html5:
+    preprocessor-args: '-DHTML -DHTML5'
+general-latex:
+    preprocessor-args: '-DTEX'
+```
+
+The corresponding configuration for [gpp](https://logological.org/gpp) would actually be identical except for the preprocessing command itself.
+
+```yaml
+preprocessor-command: 'gpp -H -I~/.config/pdc/macros.gpp'
+general:
+    preprocessor-args: '-DFALLBACK'
+format-html5:
+    preprocessor-args: '-DHTML -DHTML5'
+general-latex:
+    preprocessor-args: '-DTEX'
+```
+
+An interesting blog entry describing the advantages of using gpp with pandoc can be found [here](https://randomdeterminism.wordpress.com/2012/06/01/how-i-stopped-worring-and-started-using-markdown-like-tex/).
+
+In many cases, preprocessing represents an efficient and highly configurable alternative to using pandoc filters.
+
 
 ## Copyright and license
 

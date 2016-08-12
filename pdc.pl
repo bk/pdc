@@ -4,7 +4,6 @@
 use strict;
 use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
-use File::Temp qw/tempfile/;
 use Getopt::Long;
 
 #### PRELIMINARIES
@@ -100,7 +99,7 @@ sub get_command {
     $mddir .= '/' unless $mddir =~ /\/$/;
     my $fmt = $format eq 'pdf' ? 'latex' : $format;
     my @pre_cmd = ();
-    # TODO: maybe make it possible to set list of extensions, or
+    # TODO: maybe make it possible to set list of markdown extensions, or
     # markdown base variant + extensions?
     my $core_cmd = ['pandoc', '-f', 'markdown'];
     my @post_cmd = ();
@@ -143,6 +142,7 @@ sub get_command {
     }
     # filters, metadata, variables
     my $filters = conf_val($conf, 'filters', $fmt) || [];
+    push @$filters, "pandoc-citeproc" if conf_val($conf, 'citeproc', $fmt);
     foreach my $filter (@$filters) {
         push @$core_cmd, "--filter=$filter";
     }
@@ -189,8 +189,33 @@ sub get_command {
             if -f $output_file && !$conf->{overwrite};
     }
     push @$core_cmd, '-o', $output_file;
-    # input file
-    push @$core_cmd, @mdfiles;
+    # input file (possibly after preprocess)
+    my $preprocess = conf_val($conf, 'preprocess-command', $fmt);
+    my $preprocess_args = conf_val($conf, 'preprocess-args', $fmt) || '';
+    if ($preprocess) {
+        # Note that we need to create the temporary file in the same directory as
+        # the original markdown file, in case that it references external resources.
+        my $tempfile = "${mddir}_pdctmp.".time.".".$$.".$format.md";
+        die "Temp file $tempfile exists!\n" if -f $tempfile;
+        # The sed filter removes any leading whitespace from the result;
+        # gpp is especially bad about leaving whitespace when you include a macro
+        # file from the command line.
+        my $sed_clean = q(sed -e :a -e '/[^[:blank:]]/,$!d; /^[[:space:]]*$/{ $d; N; ba' -e '}');
+        my $fnstr = join(' ', map { shellescape_filename($_) } @mdfiles);
+        my $cmd = "cat $fnstr | $preprocess $preprocess_args | $sed_clean > $tempfile";
+        push @pre_cmd, sub {
+            warn "  --> preprocess: $cmd\n";
+            system($cmd)==0 or die "ERROR: preprocess failed!\n";
+        };
+        push @post_cmd, sub {
+            warn "  --> postprocess: unlink $tempfile\n";
+            unlink $tempfile or warn "WARNING: could not unlink $tempfile\n";
+        };
+        push @$core_cmd, $tempfile;
+    }
+    else {
+        push @$core_cmd, @mdfiles;
+    }
     if ($two_stage) {
         # This is triggered in case of --biblatex or --natbib
         my $latexmk = ['latexmk', '-cd', '-quiet', '-silent'];
@@ -229,6 +254,7 @@ sub conf_val {
             $try_key = $conf->{$try_key}->{inherit} || 'general';
         }
     }
+    return $conf->{$key} if $conf->{$key} && $conf->{$key} ne 'false';
     return;
 }
 
@@ -281,16 +307,11 @@ sub get_meta {
             $pdc = merge_conf($pdc, $iconf);
         }
         # special bibliography handling
-        if (exists $meta->{bibliography}) {
-            $pdc->{general}->{bibliography} = $meta->{bibliography}
-                unless exists $pdc->{general}->{bibliography};
-        }
-        if ($pdc->{'no-bib'} && $pdc->{'no-bib'} ne 'false') {
-            $pdc->{general}->{bibliography} = '';
-            $pdc->{general}->{citeproc} = undef;
-            $pdc->{general}->{csl} = '';
-            $pdc->{"general-latex"}->{biblatex} = undef;
-            $pdc->{"general-latex"}->{natbib} = undef;
+        for my $k (qw/bibliography csl/) {
+            if (exists $meta->{$k}) {
+                $pdc->{general}->{$k} = $meta->{$k}
+                    unless exists $pdc->{general}->{$k};
+            }
         }
         return $pdc;
     } else {
@@ -338,6 +359,12 @@ sub output_dir_ok {
     my $parent_dir = $1 if $dir =~ /(.*)\//;
     return 1 if -d $parent_dir;
     return 0;
+}
+
+sub shellescape_filename {
+    my $fn = shift;
+    $fn =~ s{'}{'\\''}g;
+    return "'$fn'";
 }
 
 sub usage {

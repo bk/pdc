@@ -21,6 +21,15 @@ overwrite: false
 # but kept here for the sake of completeness (as well as documentation).
 include: ''
 
+# Preprocessing support. It can be overridden by placing these directives
+# it in specific sections, whether 'general' or 'format-*'.
+# Both directives are strings and may contain spaces.
+# Examples of preprocess-command:
+#   'm4', 'gpp -H -Imacros.gpp', 'm4 -P ~/.config/pdc/macros.m4 -'
+# Example of preprocess-args: '-DPDF -DSLIDES -DBEAMER'
+preprocess-command: ''
+preprocess-args: ''
+
 # GENERAL OPTIONS, applicable to the reader or to multiple writers.
 # Overridable and extensible through ('general-*' and) 'format-*' options in
 # the document meta block or in included yaml files. Note that 'pdf' format
@@ -72,7 +81,9 @@ general:
     # for slide formats
     incremental: false
     slide-level: 0
-    # citations (see also under general-latex)
+    # Citations - see also under general-latex. Note that 'citeproc'
+    # does not directly correspond to a pandoc command-line argument,
+    # but is an alias for adding 'pandoc-citeproc' to 'filters'.
     citeproc: true
     csl: ''
     bibliography: ''
