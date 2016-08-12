@@ -5,6 +5,7 @@ use strict;
 use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
 use File::Temp qw/tempfile/;
+use Getopt::Long;
 
 #### PRELIMINARIES
 
@@ -40,27 +41,41 @@ my $conf_dir = "$ENV{HOME}/.config/pdc";
 my $config_file = "$conf_dir/defaults.yaml";
 die "config file $config_file does not exist" unless -f $config_file;
 
-my $mdfile = shift or die "Need markdown file as parameter";
-die "markdown file $mdfile does not exist" unless -f $mdfile;
+# Global options
+my (@formats, $output_dir, $include_yaml, $target_name, $help);
+GetOptions ("to|formats|t:s" => \@formats,
+            "output-dir|d:s" => \$output_dir,
+            "include-yaml|i:s" => \$include_yaml,
+            "target-name|n:s" => \$target_name,
+            "help|h" => \$help);
+die usage() if $help;
+@formats = split(/,/, join(',',@formats));
+check_options();
+
+my @mdfiles = @ARGV or die "ERROR: Need at least one markdown file as parameter\n";
+for my $mdf (@mdfiles) {
+    die "ERROR: markdown file $mdf does not exist\n" unless -f $mdf;
+}
 
 #### CONFIG
 
 # Meta section from md document (possibly following 'include' directive
 # to fetch an external config file, which may chain on to others).
-my $meta = get_meta($mdfile);
+my $meta = get_meta($mdfiles[0]);
 my $conf = load_config($config_file);
 $conf = merge_conf($meta, $conf);
+$conf->{formats} = \@formats if @formats;
 
 # If both 'pdf' and 'latex' are in formats,
 # 'generate-pdf' in 'format-latex' would be superfluous.
-if (grep {/pdf/} @{$conf->{formats}} && grep {/latex/} @{$conf->{formats}}) {
+if (join('::', sort @{$conf->{formats}}) =~ /latex:.*:pdf/) {
     $conf->{'format-latex'}->{'generate-pdf'} = 0;
 }
 
 #### MAIN SECTION
 
 foreach my $format (@{ $conf->{formats} }) {
-    my @cmds = get_command($format, $mdfile, $conf);
+    my @cmds = get_command($format, $conf, @mdfiles);
     foreach my $cmd (@cmds) {
         if (ref $cmd eq 'CODE') {
             print "[CLEANUP/PREP $format]\n";
@@ -78,13 +93,15 @@ foreach my $format (@{ $conf->{formats} }) {
 #### SUBS BELOW
 
 sub get_command {
-    my ($format, $mdfile, $conf) = @_;
-    my $iext = $1 if $mdfile=~/(\.\w+)$/;
-    my ($mdfn, $mddir, $input_ext) = fileparse($mdfile, $iext);
+    my ($format, $conf, @mdfiles) = @_;
+    my $iext = $1 if $mdfiles[0] =~ /(\.\w+)$/;
+    my ($mdfn, $mddir, $input_ext) = fileparse($mdfiles[0], $iext);
     $mddir ||= './';
     $mddir .= '/' unless $mddir =~ /\/$/;
     my $fmt = $format eq 'pdf' ? 'latex' : $format;
     my @pre_cmd = ();
+    # TODO: maybe make it possible to set list of extensions, or
+    # markdown base variant + extensions?
     my $core_cmd = ['pandoc', '-f', 'markdown'];
     my @post_cmd = ();
     # TODO: Preprocessor support; will affect @pre_cmd, @post_cmd.
@@ -156,20 +173,24 @@ sub get_command {
     }
     # output files (and dir)
     my $output_file;
-    if ($conf->{outputdir}) {
-        my $outputdir = "$mddir$mdfn.pdc";
+    # possibly override target filename
+    my $trg = ($target_name || $conf->{target_name} || '');
+    $mdfn = $trg if $trg;
+    if ($output_dir || ($conf->{'output-dir'} && $conf->{'output-dir'} ne 'false')) {
+        my $outputdir = $output_dir || $conf->{'output-dir'};
+        $outputdir = "$mddir$mdfn.pdc" if $outputdir eq 'auto';
         unless (-d $outputdir) {
-            mkdir $outputdir or die "Could not makedir $outputdir";
+            mkdir $outputdir or die "ERROR: Could not mkdir $outputdir: $!\n";
         }
         $output_file = "$outputdir/$mdfn.$ext";
     } else {
         $output_file = "$mddir/$mdfn.$ext";
-        die "Refusing to overwrite $output_file when outputdir is false"
+        die "ERROR: Refusing to overwrite existing $output_file when outputdir has not been specified\n"
             if -f $output_file && !$conf->{overwrite};
     }
     push @$core_cmd, '-o', $output_file;
     # input file
-    push @$core_cmd, $mdfile;
+    push @$core_cmd, @mdfiles;
     if ($two_stage) {
         # This is triggered in case of --biblatex or --natbib
         my $latexmk = ['latexmk', '-cd', '-quiet', '-silent'];
@@ -219,10 +240,10 @@ sub load_config {
 }
 
 sub get_meta {
-    # Parses the YAML meta block and returns the 'pdc' key, if any.
-    # If there is an 'include' subkey, try to load the referenced yaml
-    # file, possibly recursively, and merge it with the values here
-    # before returning.
+    # Parses the YAML meta block and returns the 'pdc' key, if any. If there
+    # is an 'include' subkey or an '--include-yaml' command line switch, try
+    # to load the referenced yaml file, possibly recursively, and merge it
+    # with the values here before returning.
     my $mdfile = shift;
     my $meta_block = '';
     my $seen_start = 0;
@@ -241,9 +262,12 @@ sub get_meta {
         }
     }
     close IN;
-    if ($meta_block) {
+    if ($meta_block || $include_yaml) {
         my $meta = Load($meta_block) || {};
         my $pdc = $meta->{pdc} || {};
+        if ($include_yaml) {
+            $pdc->{include} ||= $include_yaml;
+        }
         $pdc->{general} ||= {};
         # follow potential chain of includes.
         my %loaded = ();
@@ -288,4 +312,63 @@ sub merge_conf {
         }
     }
     return $conf;
+}
+
+sub check_options {
+    # @formats are not checked
+    if ($output_dir) {
+        die "ERROR: output dir $output_dir (or its parent_directory) does not exist\n"
+            unless output_dir_ok($output_dir);
+    }
+    if ($include_yaml) {
+        die "ERROR: YAML file $include_yaml does not exist\n"
+            unless -f $include_yaml;
+    }
+    if ($target_name && $target_name =~ /\//) {
+        die "ERROR: target_name must be bare, without directory\n";
+    }
+}
+
+sub output_dir_ok {
+    # Either the output dir or its parent must exist.
+    my $dir = shift;
+    return 1 if -d $dir;
+    return 1 if $dir =~ /^[^\/]+$/;
+    $dir =~ s/\/+$//;
+    my $parent_dir = $1 if $dir =~ /(.*)\//;
+    return 1 if -d $parent_dir;
+    return 0;
+}
+
+sub usage {
+    my $prog_name = $0;
+    $prog_name =~ s/.*\///;
+    return qq[$prog_name - Pandoc wrapper script
+
+Usage: $prog_name [OPTIONS] FILES
+
+Options:
+
+  -t FORMAT or --to=FORMAT or --formats=FORMAT
+
+    Output format override. May be repeated, e.g. '--to pdf --to html',
+    or specified as a single comma-separated string, e.g '-t pdf,html'.
+
+  -i YAML_FILE or --include-yaml=YAML_FILE
+
+    Read extra config file and merge with settings in document.
+    Corresponds to 'include' key in 'pdc' section of document meta.
+
+  -d DIRNAME or --output-dir=DIRNAME
+
+    Output files to this directory.
+
+  -n TARGETNAME or --target-name=TARGETNAME
+
+    Name (without directory or extension) of output files.
+
+  -h or --help
+
+     This help message.
+];
 }

@@ -18,7 +18,9 @@ Some configuration options, notably turning on `--biblatex` or `--natbib` when p
 
 ## Usage
 
-In order to process a Markdown document (e.g. `myfile.md`) with `pdc`, simply run `pdc myfile.md`. Assuming that you have not changed the default settings, a subdirectory called `myfile.pdc` will be created in the same directory as `myfile.md`, and output files for three formats (pdf, latex and html5) will be placed there.
+In order to process a Markdown document (e.g. `myfile.md`) with `pdc`, simply run `pdc myfile.md`. Assuming that you have not changed the default settings and not overriden the default behaviour through command line arguments (for which see below), a subdirectory called `myfile.pdc` will be created in the same directory as `myfile.md`, and output files for three formats (pdf, latex and html5) will be placed there.
+
+Like with pandoc, you can also specify multiple source files which together will be turned into a single target document for each of the configured formats. However, unlike pandoc, `pdc` does not read markdown source from STDIN, so do not attempt to pipe data to it.
 
 In order to select formats and otherwise customize the conversion process, add a `pdc` section to your document meta block, like in this example:
 
@@ -85,11 +87,21 @@ format-epub:
 
 Take a look at `defaults.yaml` for further information on the supported conversion settings. Most settings map directly on to `pandoc` command line options, while the rest is explained using comments.
 
+## Command line arguments
+
+- `-h` or `--help`: Outputs a brief help message.
+
+- `-t FORMAT` or `--to=FORMAT` or `--formats=FORMAT`: Overrides the list of formats specified in the meta block or in `defaults.yaml`. A list may be specified either by repeating the argument (e.g. `--to pdf --to html`) or by specifying a single comma-separated string (e.g `--formats=pdf,html`).
+
+- `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Sets or overrides the `include` key in the meta block. YAML files will be searched for in the `.config/pdc/` directory.
+
+- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. Corresponds to (and overrides) the `output-dir` setting in the meta block.
+
+-  `-n TARGETNAME` or `--target-name=TARGETNAME`: Overrides the basename of the target file(s), which by default is the same as the name of the first source file specified. This is mostly useful when there are multiple source files, e.g. `pdc -n book ch1.md ch2.md ch3.md`. Note that if `output-dir` is `auto`, this also affects the name of the output directory; in the above example, the export files would therefore be placed in the directory `book.pdc`.
+
 ## Planned features
 
 - Configurable post-processing of target files by running a shell script or other external command on them.
-- Making the naming and placement of the output directory more configurable.
-- Making `formats` and `include` overridable from the command line, and probably the output directory as well.
 - Integrated preprocessor support using e.g. [m4](https://www.gnu.org/software/m4/manual/index.html) or [gpp](https://logological.org/gpp). An interesting blog entry describing the advantages of using gpp with pandoc can be found [here](https://randomdeterminism.wordpress.com/2012/06/01/how-i-stopped-worring-and-started-using-markdown-like-tex/).
 
 ## Copyright and license

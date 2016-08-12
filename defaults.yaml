@@ -1,26 +1,30 @@
 # TOP-LEVEL SETTINGS
+
 # Which output formats to turn on; valid are all output formats supported by
-# pandoc, as well as 'pdf' (meaning latex with pdf conversion)
+# pandoc, as well as 'pdf' (meaning latex with pdf conversion). Overridable
+# using the --formats (or --to, or -t) command line switch.
 #
 formats: ['pdf', 'latex', 'html5']
-# If true, creates dir for all output ($filename.pdc/).
-# If false, names output files $filename.$ext in same dir as $filename.
-outputdir: true
-# If outputdir is false, files are only overwritten when this is true.
-# (It has no effect when outputdir is true.)
+
+# Directory in which to place output files; can be overridden using the
+# --output-dir (or -d) switch. If the value is 'auto' (the default), creates a
+# dir named $filename.pdc/ in the same directory as the (first) input file. If
+# false or empty string, puts output files $filename.$ext in same dir as
+# $filename.
+output-dir: 'auto'
+
+# If outputdir is a false value, files are only overwritten when this is true.
+# (It has no effect when outputdir has a value or is 'auto').
 overwrite: false
-# Quick way of getting rid of the overhead of running pandoc-citeproc
-# in small documents even if a default bibliography is specified under
-# 'general'
-no-bib: false
+
 # Include an external file. Never used in the default config,
-# but kept here for completeness.
+# but kept here for the sake of completeness (as well as documentation).
 include: ''
-#
+
 # GENERAL OPTIONS, applicable to the reader or to multiple writers.
-# Overridable through ('general-*' and) 'format-*' options. Note that 'pdf'
-# format uses general-latex and format-latex overrides.
-#
+# Overridable and extensible through ('general-*' and) 'format-*' options in
+# the document meta block or in included yaml files. Note that 'pdf' format
+# uses general-latex and format-latex settings.
 general:
     # READER options:
     parse-raw: false
@@ -72,6 +76,11 @@ general:
     citeproc: true
     csl: ''
     bibliography: ''
+
+# Default options intended for html, html5, as well as revealjs and other
+# html-based slides formats. Note that format-html, etc. do not inherit from
+# this automatically but have to explicitly point to it using the 'inherit'
+# key.
 general-html:
     self-contained: false
     html-q-tags: false
@@ -92,12 +101,15 @@ general-html:
     webtex: false
     katex: false
     katex-stylesheet: ''
+
 format-html:
     inherit: 'general-html'
     extension: 'htm'
+
 format-html5:
     inherit: 'general-html'
     extension: 'html'
+
 format-epub:
     inherit: 'general-html'
     epub-stylesheet: ''
@@ -105,10 +117,13 @@ format-epub:
     epub-metadata: ''
     epub-embed-font: ''
     epub-chapter-level: 1
+
 format-odt:
     reference-odt: ''
+
 format-docx:
     reference-docx: ''
+
 general-latex:
     # If true, generate pdf in a separate step. Also makes it possible
     # to generate pdf for beamer but not normal latex output, and without
@@ -124,13 +139,18 @@ general-latex:
     # in a separate step using latexmk, which needs to be in $PATH.
     biblatex: false
     natbib: false
+
 format-beamer:
     inherit: 'general-latex'
     extension: 'beamer.tex'
     generate-pdf: true
     pdf-extension: 'beamer.pdf'
+
 format-latex:
     inherit: 'general-latex'
+    # Note that if you set any variables in the meta block, they will replace
+    # the whole 'variables' section rather than overriding each of these
+    # settings individually.
     variables:
         papersize: a4
         fontsize: 12pt
