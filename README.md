@@ -110,11 +110,11 @@ If one uses [m4](https://www.gnu.org/software/m4/manual/index.html), the preproc
 ```yaml
 preprocess-command: 'm4 -P ~/.config/pdc/macros.m4 -'
 general:
-    preprocessor-args: '-DFALLBACK'
+    preprocess-args: '-DFALLBACK'
 format-html5:
-    preprocessor-args: '-DHTML -DHTML5'
+    preprocess-args: '-DHTML -DHTML5'
 general-latex:
-    preprocessor-args: '-DTEX'
+    preprocess-args: '-DTEX'
 ```
 
 The corresponding configuration for [gpp](https://logological.org/gpp) would actually be identical except for the preprocessing command itself.
@@ -122,11 +122,11 @@ The corresponding configuration for [gpp](https://logological.org/gpp) would act
 ```yaml
 preprocess-command: 'gpp -H -I~/.config/pdc/macros.gpp'
 general:
-    preprocessor-args: '-DFALLBACK'
+    preprocess-args: '-DFALLBACK'
 format-html5:
-    preprocessor-args: '-DHTML -DHTML5'
+    preprocess-args: '-DHTML -DHTML5'
 general-latex:
-    preprocessor-args: '-DTEX'
+    preprocess-args: '-DTEX'
 ```
 
 An interesting blog entry describing the advantages of using gpp with pandoc can be found [here](https://randomdeterminism.wordpress.com/2012/06/01/how-i-stopped-worring-and-started-using-markdown-like-tex/).
@@ -176,7 +176,7 @@ pdc:
         generate-pdf: true
 ```
 
-By the way, note that `m4-config` and its value is completely ignored by `pdc`; it is simply a trick for changing the settings of `m4` in a nonobtrusive way and as early as possible.
+Note the `m4-config` option here; it is merely a small trick for changing the quote settings for `m4` in a nonobtrusive way and as early in the document as possible. It does not affect `pdc` itself.
 
 If both `postprocess` and `generate-pdf` are present, all the steps specified in `postprocess` are called before pdf generation is attended to. One needs to be aware of this, because it means that if one wishes to do something special both *before* and *after* a PDF file is created one should turn `generate-pdf` off and instead do everything in `postprocess`. (Such was the case in the illustrative example for `postprocess` above).
 
