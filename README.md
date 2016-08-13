@@ -101,14 +101,14 @@ Take a look at `defaults.yaml` for further information on the supported conversi
 
 ## Automatically preprocessing source files
 
-It is possible to tell `pdc` to run the markdown files through a preprocessor before converting them. In order to do this, you set the key `preprocessor-command` in your settings, either at the top level or for a specific format. In the main, however, you would wish to turn this on globally for all output formats, since it relates to the source files. On the other hand, `preprocessor-args` would often be different for different outputs, since you would commonly wish to include or exclude specific sections of your document based on the output format.
+It is possible to tell `pdc` to run the markdown files through a preprocessor before converting them. In order to do this, you set the key `preprocess-command` in your settings, either at the top level or for a specific format. In the main, however, you would wish to turn this on globally for all output formats, since it relates to the source files. On the other hand, `preprocess-args` would often be different for different outputs, since you would commonly wish to include or exclude specific sections of your document based on the output format.
 
-The command specified in `preprocessor-command` must read from standard input and write to standard output.
+The command specified in `preprocess-command` must read from standard input and write to standard output.
 
 If one uses [m4](https://www.gnu.org/software/m4/manual/index.html), the preprocessing settings might look like this:
 
 ```yaml
-preprocessor-command: 'm4 -P ~/.config/pdc/macros.m4 -'
+preprocess-command: 'm4 -P ~/.config/pdc/macros.m4 -'
 general:
     preprocessor-args: '-DFALLBACK'
 format-html5:
@@ -120,7 +120,7 @@ general-latex:
 The corresponding configuration for [gpp](https://logological.org/gpp) would actually be identical except for the preprocessing command itself.
 
 ```yaml
-preprocessor-command: 'gpp -H -I~/.config/pdc/macros.gpp'
+preprocess-command: 'gpp -H -I~/.config/pdc/macros.gpp'
 general:
     preprocessor-args: '-DFALLBACK'
 format-html5:
@@ -133,6 +133,52 @@ An interesting blog entry describing the advantages of using gpp with pandoc can
 
 In many cases, preprocessing represents an efficient and highly configurable alternative to using pandoc filters.
 
+## Post-processing output files
+
+### `postprocess`
+
+Sometimes you need to do something with an output file after `pandoc` is done with it, e.g. run it through a fix-up filter of some kind or placing it onto your web site. By adding a `postprocess` section to the configuration for the appropriate format, `pdc` will run these commands for you automatically each time it is invoked. It is possible to run several preprocess commands for the same output format. Each preprocess command receives the name of the output file as its only argument.
+
+The following example from a document meta block shows an instance where the latex output from pandoc had some small imperfections that needed to be smoothed out before actually generating the pdf. The pdf generation is therefore relegated to a post-processing step, rather than being explicitly listed in `formats`. In this way, one can almost always avoid having to write a makefile or shell script (or running the entire repetitive sequence of commands by hand).
+
+```yaml
+pdc:
+    formats: ['latex', 'html5']
+    format-html5:
+        template: 'website.longread.html5'
+        postprocess: ['send_to_site.py --target-dir=essays/']
+    format-latex:
+        include-before-body: titlepage.tex
+        toc: true
+        template: 'fancy.latex'
+        postprocess:
+            'perl fixups.pl'
+            'latexmk -cd -silent -xelatex'
+            'latexmk -cd -silent -c'
+            'send_to_web.py --look-for=pdf --dest=files/pdfs/essays/'
+```
+
+### `generate-pdf`
+
+Converting the output to PDF is in fact an especially common kind of post-processing. Normally one can simply add 'pdf' to `formats`, but (as we saw above) this is not always the optimal solution. Also, one may want to generate two or more pdf files at once, for instance when producing both slides and an article from the same source file. For such cases, the `generate-pdf` configuration option is provided, often obviating the need for using `postprocess`. It is valid for the output formats `latex`, `beamer`, `context`, `html`, and `html5` (Note that PDF support for the latter requires [wkhtmltopdf](http://wkhtmltopdf.org/) to be installed). Here is a somewhat typical usage example:
+
+```yaml
+pdc:
+    formats: ['latex', 'beamer']
+    preprocess-command: 'm4 -P'
+    m4-config: "m4_changequote(`<<', `>>')"
+    format-beamer:
+        preprocess-args: "-DSLIDES"
+        pdf-exension: beamer.pdf
+        generate-pdf: true
+    format-latex:
+        preprocess-args: "-DARTICLE"
+        generate-pdf: true
+```
+
+By the way, note that `m4-config` and its value is completely ignored by `pdc`; it is simply a trick for changing the settings of `m4` in a nonobtrusive way and as early as possible.
+
+If both `postprocess` and `generate-pdf` are present, all the steps specified in `postprocess` are called before pdf generation is attended to. One needs to be aware of this, because it means that if one wishes to do something special both *before* and *after* a PDF file is created one should turn `generate-pdf` off and instead do everything in `postprocess`. (Such was the case in the illustrative example for `postprocess` above).
 
 ## Copyright and license
 
