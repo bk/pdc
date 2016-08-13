@@ -113,6 +113,7 @@ sub get_command {
     # (in case of --biblatex/--natbib).
     my $two_stage = 0;
     my $ext = $format eq 'pdf' ? 'pdf' : conf_val($conf, 'extension', $fmt);
+    my $pdfext = conf_val($conf, 'pdf-extension', $fmt) || 'pdf';
     $ext ||= $format;
     if ($format eq 'pdf' && (
             conf_val($conf, 'biblatex', $fmt) || conf_val($conf, 'natbib', $fmt))) {
@@ -208,7 +209,7 @@ sub get_command {
             system($cmd)==0 or die "ERROR: preprocess failed!\n";
         };
         push @post_cmd, sub {
-            warn "  --> postprocess: unlink $tempfile\n";
+            warn "  --> preprocess cleanup: unlink $tempfile\n";
             unlink $tempfile or warn "WARNING: could not unlink $tempfile\n";
         };
         push @$core_cmd, $tempfile;
@@ -233,6 +234,51 @@ sub get_command {
         $newnam =~ s/\.tmp\.pdf$/\.pdf/;
         # rename pdf file (get rid of .tmp extension prefix)
         push @post_cmd, ['mv', $nam, $newnam];
+    }
+    # User-configured postprocessing
+    my $postprocess = conf_val($conf, 'postprocess', $fmt);
+    $postprocess = [$postprocess] if $postprocess && !ref $postprocess;
+    foreach my $cmd (@$postprocess) {
+        my $fnarg = shellescape_filename($output_file);
+        push @post_cmd, sub {
+            warn "  --> post-process: $cmd $fnarg\n";
+            system("$cmd $fnarg") == 0 or warn "WARNING: postprocessing command failed: $!\n";
+        };
+    }
+    # Generate-pdf config option
+    my $generate_pdf = conf_val($conf, 'generate-pdf', $fmt);
+    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?)$/ && $ext !~ /pdf/) {
+        my $pdf_output_file = $output_file;
+        $pdf_output_file =~ s/$ext$/$pdfext/;
+        my (@cmd, @cleanup);
+        if ($fmt =~ /html/) {
+            my $vars = conf_val($conf, 'variables', $fmt) || {};
+            my @opts = ();
+            foreach my $side (qw/top right bottom left/) {
+                my $k = "margin-$side";
+                push(@opts, "--$k", $vars->{$k}) if $vars->{$k};
+            }
+            push(@opts, '--page-size', $vars->{papersize}) if $vars->{papersize};
+            @cmd = ('wkhtmltopdf', @opts, $output_file, $pdf_output_file);
+        }
+        elsif ($fmt eq 'context') {
+            push @cmd, qw/context --batchmode --purge --result/;
+            push @cmd, $pdf_output_file, $output_file;
+        }
+        else {
+            push @cmd, qw/latexmk -cd -silent/;
+            my $eng = conf_val($conf, 'latex-engine', $fmt) || 'xelatex';
+            $eng = 'pdf' if $eng eq 'pdflatex';
+            # TODO: handle latex-engine-opt
+            push @cmd, "-$eng";
+            push @cmd, $output_file;
+            @cleanup = (qw/latexmk -cd -c/, $output_file);
+        }
+        push @post_cmd, \@cmd;
+        push @post_cmd, \@cleanup if @cleanup;
+    }
+    elsif ($generate_pdf) {
+        warn "WARNING: generate-pdf option not supported for format $fmt -- skipping\n";
     }
     return (@pre_cmd, $core_cmd, @post_cmd);
 }
