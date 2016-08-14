@@ -74,7 +74,7 @@ if (join('::', sort @{$conf->{formats}}) =~ /latex:.*:pdf/) {
 #### MAIN SECTION
 
 foreach my $format (@{ $conf->{formats} }) {
-    my @cmds = get_command($format, $conf, @mdfiles);
+    my @cmds = get_commands($format, $conf, @mdfiles);
     foreach my $cmd (@cmds) {
         if (ref $cmd eq 'CODE') {
             print "[CLEANUP/PREP $format]\n";
@@ -91,7 +91,7 @@ foreach my $format (@{ $conf->{formats} }) {
 
 #### SUBS BELOW
 
-sub get_command {
+sub get_commands {
     my ($format, $conf, @mdfiles) = @_;
     my $iext = $1 if $mdfiles[0] =~ /(\.\w+)$/;
     my ($mdfn, $mddir, $input_ext) = fileparse($mdfiles[0], $iext);
@@ -103,7 +103,6 @@ sub get_command {
     # markdown base variant + extensions?
     my $core_cmd = ['pandoc', '-f', 'markdown'];
     my @post_cmd = ();
-    # TODO: Preprocessor support; will affect @pre_cmd, @post_cmd.
     if ($format eq 'pdf') {
         push @$core_cmd, "-t", "latex";
     } else {
@@ -112,66 +111,23 @@ sub get_command {
     # Turn on if we need two-stage conversion to pdf
     # (in case of --biblatex/--natbib).
     my $two_stage = 0;
-    my $ext = $format eq 'pdf' ? 'pdf' : conf_val($conf, 'extension', $fmt);
-    my $pdfext = conf_val($conf, 'pdf-extension', $fmt) || 'pdf';
+    my $c = new Conf (format=>$fmt, conf=>$conf);
+    my $ext = $format eq 'pdf' ? 'pdf' : $c->val('extension');
+    my $pdfext = $c->val('pdf-extension') || 'pdf';
     $ext ||= $format;
-    if ($format eq 'pdf' && (
-            conf_val($conf, 'biblatex', $fmt) || conf_val($conf, 'natbib', $fmt))) {
+    if ($format eq 'pdf' && ($c->val('biblatex') || $c->val('natbib'))) {
         $ext = 'tmp.tex'; # so as not to conflict with possible separate latex doc
         $two_stage = 1;
     }
-    # common switches
-    foreach my $ss (@{$pandoc_args{simple_switches}}) {
-        my $val = conf_val($conf, $ss, $fmt);
-        push @$core_cmd, "--$ss" if $val;
-    }
-    foreach my $ma (@{$pandoc_args{mixed_args}}) {
-        my $val = conf_val($conf, $ma, $fmt);
-        if ($val =~ /[\.\/]/) {
-            push @$core_cmd, "--$ma=$val";
-        } elsif ($val) {
-            push @$core_cmd, "--$ma";
-        }
-    }
-    foreach my $param (@{$pandoc_args{params}}) {
-        my $val = conf_val($conf, $param, $fmt);
-        next unless $val;
-        $val = [$val] unless ref $val eq 'ARRAY';
-        foreach my $v (@$val) {
-            push @$core_cmd, "--$param=$v";
-        }
-    }
+    # Options directly corresponding to pandoc command-line args
+    get_basic_pandoc_args($c, $core_cmd);
+
     # filters, metadata, variables
-    my $filters = conf_val($conf, 'filters', $fmt) || [];
-    push @$filters, "pandoc-citeproc" if conf_val($conf, 'citeproc', $fmt);
-    foreach my $filter (@$filters) {
-        push @$core_cmd, "--filter=$filter";
-    }
-    my $metadata = conf_val($conf, 'metadata', $fmt) || {};
-    foreach my $mk (keys %$metadata) {
-        my $val = $metadata->{$mk};
-        my $mval = defined $val && length($val) ? "$mk:$val" : $mk;
-        push @$core_cmd, "--metadata=$mval";
-    }
-    my $variables = conf_val($conf, 'variables', $fmt) || {};
-    foreach my $vk (keys %$variables) {
-        my $val = $variables->{$vk};
-        $val = undef if $val eq 'false';
-        my $vval = defined $val && length($val) ? "$vk:$val" : undef;
-        push @$core_cmd, "--variable=$vval" if $vval;
-    }
+    get_filters_etc($c, $core_cmd);
+
     # template
-    my $tpl = conf_val($conf, 'template', $fmt);
-    unless ($tpl) {
-        my $tpl_base = conf_val($conf, 'template-basename', $fmt);
-        if ($tpl_base) {
-            $tpl = "$tpl_base.$fmt";
-            $tpl = undef unless -f "$ENV{HOME}/.pandoc/templates/$tpl";
-        }
-    }
-    if ($tpl) {
-        push @$core_cmd, "--template=$tpl";
-    }
+    get_template($c, $core_cmd, $fmt);
+
     # output files (and dir)
     my $output_file;
     # possibly override target filename
@@ -190,9 +146,100 @@ sub get_command {
             if -f $output_file && !$conf->{overwrite};
     }
     push @$core_cmd, '-o', $output_file;
-    # input file (possibly after preprocess)
-    my $preprocess = conf_val($conf, 'preprocess-command', $fmt);
-    my $preprocess_args = conf_val($conf, 'preprocess-args', $fmt) || '';
+
+    # preprocess + add input file(s) to core_cmd
+    get_input_files_and_preprocess(
+        $c, $core_cmd, \@pre_cmd, \@post_cmd, $format, $mddir);
+
+    # User-configured postprocessing
+    get_postprocessing($c, \@post_cmd, $output_file);
+
+    # Two-stage pdf production in virtue of biblatex/natbib
+    # (when 'pdf' is in formats). Note that this should run after postprocessing
+    # so that filters, if present, will work.
+    if ($two_stage) {
+        maybe_biblatex_natbib($c, \@post_cmd, $output_file);
+    }
+    # Two-stage pdf production when 'pdf' is not in formats or does
+    # not apply to this format.
+    get_generate_pdf($c, \@post_cmd, $fmt, $output_file, $ext, $pdfext);
+
+    return (@pre_cmd, $core_cmd, @post_cmd);
+}
+
+sub get_basic_pandoc_args {
+    # Assembles the arguments directly corresponding to pandoc command-line switches.
+    # Called by get_commands.
+    my ($c, $core_cmd) = @_;
+    # common switches
+    foreach my $ss (@{$pandoc_args{simple_switches}}) {
+        my $val = $c->val($ss);
+        push @$core_cmd, "--$ss" if $val;
+    }
+    foreach my $ma (@{$pandoc_args{mixed_args}}) {
+        my $val = $c->val($ma);
+        if ($val =~ /[\.\/]/) {
+            push @$core_cmd, "--$ma=$val";
+        } elsif ($val) {
+            push @$core_cmd, "--$ma";
+        }
+    }
+    foreach my $param (@{$pandoc_args{params}}) {
+        my $val = $c->val($param);
+        next unless $val;
+        $val = [$val] unless ref $val eq 'ARRAY';
+        foreach my $v (@$val) {
+            push @$core_cmd, "--$param=$v";
+        }
+    }
+}
+
+sub get_filters_etc {
+    # Process filters, metadata and variables and add to core_cmd.
+    my ($c, $core_cmd) = @_;
+    my $filters = $c->val('filters') || [];
+    push @$filters, "pandoc-citeproc" if $c->val('citeproc');
+    foreach my $filter (@$filters) {
+        push @$core_cmd, "--filter=$filter";
+    }
+    my $metadata = $c->val('metadata') || {};
+    foreach my $mk (keys %$metadata) {
+        my $val = $metadata->{$mk};
+        my $mval = defined $val && length($val) ? "$mk:$val" : $mk;
+        push @$core_cmd, "--metadata=$mval";
+    }
+    my $variables = $c->val('variables') || {};
+    foreach my $vk (keys %$variables) {
+        my $val = $variables->{$vk};
+        $val = undef if $val eq 'false';
+        my $vval = defined $val && length($val) ? "$vk:$val" : undef;
+        push @$core_cmd, "--variable=$vval" if $vval;
+    }
+}
+
+sub get_template {
+    # Get template (if applicable) and add to core_cmd.
+    my ($c, $core_cmd, $fmt) = @_;
+    # template
+    my $tpl = $c->val('template');
+    unless ($tpl) {
+        my $tpl_base = $c->val('template-basename');
+        if ($tpl_base) {
+            $tpl = "$tpl_base.$fmt";
+            $tpl = undef unless -f "$ENV{HOME}/.pandoc/templates/$tpl";
+        }
+    }
+    if ($tpl) {
+        push @$core_cmd, "--template=$tpl";
+    }
+}
+
+sub get_input_files_and_preprocess {
+    # Adds input files to core_cmd, perhaps after a pre-processing stage.
+    my ($c, $core_cmd, $pre_cmd, $post_cmd, $format, $mddir) = @_;
+
+    my $preprocess = $c->val('preprocess-command');
+    my $preprocess_args = $c->val('preprocess-args') || '';
     if ($preprocess) {
         # Note that we need to create the temporary file in the same directory as
         # the original markdown file, in case that it references external resources.
@@ -204,11 +251,11 @@ sub get_command {
         my $sed_clean = q(sed -e :a -e '/[^[:blank:]]/,$!d; /^[[:space:]]*$/{ $d; N; ba' -e '}');
         my $fnstr = join(' ', map { shellescape_filename($_) } @mdfiles);
         my $cmd = "cat $fnstr | $preprocess $preprocess_args | $sed_clean > $tempfile";
-        push @pre_cmd, sub {
+        push @$pre_cmd, sub {
             warn "  --> preprocess: $cmd\n";
             system($cmd)==0 or die "ERROR: preprocess failed!\n";
         };
-        push @post_cmd, sub {
+        push @$post_cmd, sub {
             warn "  --> preprocess cleanup: unlink $tempfile\n";
             unlink $tempfile or warn "WARNING: could not unlink $tempfile\n";
         };
@@ -217,42 +264,51 @@ sub get_command {
     else {
         push @$core_cmd, @mdfiles;
     }
-    if ($two_stage) {
-        # This is triggered in case of --biblatex or --natbib
-        my $latexmk = ['latexmk', '-cd', '-quiet', '-silent'];
-        my $engine = conf_val($conf, 'latex-engine', $fmt);
-        if ($engine) {
-            push @$latexmk, ($engine eq 'pdflatex' ? '-pdf' : "-$engine");
-        }
-        push @$latexmk, $output_file;
-        push @post_cmd, $latexmk;
-        # clean up aux files, etc.
-        push @post_cmd, ['latexmk', '-cd', '-c', '-quiet', '-silent', $output_file];
-        my $nam = $output_file;
-        $nam =~ s/\.tex$/\.pdf/;
-        my $newnam = $nam;
-        $newnam =~ s/\.tmp\.pdf$/\.pdf/;
-        # rename pdf file (get rid of .tmp extension prefix)
-        push @post_cmd, ['mv', $nam, $newnam];
+}
+
+sub maybe_biblatex_natbib {
+    my ($c, $post_cmd, $output_file) = @_;
+    # This is triggered in case of --biblatex or --natbib
+    my $latexmk = ['latexmk', '-cd', '-quiet', '-silent'];
+    my $engine = $c->val('latex-engine');
+    if ($engine) {
+        push @$latexmk, ($engine eq 'pdflatex' ? '-pdf' : "-$engine");
     }
-    # User-configured postprocessing
-    my $postprocess = conf_val($conf, 'postprocess', $fmt);
+    push @$latexmk, $output_file;
+    push @$post_cmd, $latexmk;
+    # clean up aux files, etc.
+    push @$post_cmd, ['latexmk', '-cd', '-c', '-quiet', '-silent', $output_file];
+    my $nam = $output_file;
+    $nam =~ s/\.tex$/\.pdf/;
+    my $newnam = $nam;
+    $newnam =~ s/\.tmp\.pdf$/\.pdf/;
+    # rename pdf file (get rid of .tmp extension prefix)
+    push @$post_cmd, ['mv', $nam, $newnam];
+}
+
+sub get_postprocessing {
+    my ($c, $post_cmd, $output_file) = @_;
+    my $postprocess = $c->val('postprocess');
     $postprocess = [$postprocess] if $postprocess && !ref $postprocess;
     foreach my $cmd (@$postprocess) {
         my $fnarg = shellescape_filename($output_file);
-        push @post_cmd, sub {
+        push @$post_cmd, sub {
             warn "  --> post-process: $cmd $fnarg\n";
             system("$cmd $fnarg") == 0 or warn "WARNING: postprocessing command failed: $!\n";
         };
     }
-    # Generate-pdf config option
-    my $generate_pdf = conf_val($conf, 'generate-pdf', $fmt);
+}
+
+sub get_generate_pdf {
+    # generate-pdf config option
+    my ($c, $post_cmd, $fmt, $output_file, $ext, $pdfext) = @_;
+    my $generate_pdf = $c->val('generate-pdf');
     if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?)$/ && $ext !~ /pdf/) {
         my $pdf_output_file = $output_file;
         $pdf_output_file =~ s/$ext$/$pdfext/;
         my (@cmd, @cleanup);
         if ($fmt =~ /html/) {
-            my $vars = conf_val($conf, 'variables', $fmt) || {};
+            my $vars = $c->val('variables') || {};
             my @opts = ();
             foreach my $side (qw/top right bottom left/) {
                 my $k = "margin-$side";
@@ -267,41 +323,19 @@ sub get_command {
         }
         else {
             push @cmd, qw/latexmk -cd -silent/;
-            my $eng = conf_val($conf, 'latex-engine', $fmt) || 'xelatex';
+            my $eng = $c->val('latex-engine') || 'xelatex';
             $eng = 'pdf' if $eng eq 'pdflatex';
             # TODO: handle latex-engine-opt
             push @cmd, "-$eng";
             push @cmd, $output_file;
             @cleanup = (qw/latexmk -cd -c/, $output_file);
         }
-        push @post_cmd, \@cmd;
-        push @post_cmd, \@cleanup if @cleanup;
+        push @$post_cmd, \@cmd;
+        push @$post_cmd, \@cleanup if @cleanup;
     }
     elsif ($generate_pdf) {
         warn "WARNING: generate-pdf option not supported for format $fmt -- skipping\n";
     }
-    return (@pre_cmd, $core_cmd, @post_cmd);
-}
-
-sub conf_val {
-    my ($conf, $key, $fmt) = @_;
-    my $val;
-    my $try_key = "format-$fmt";
-    while ($try_key) {
-        if (exists $conf->{$try_key}->{$key}) {
-            my $val = $conf->{$try_key}->{$key};
-            $val = undef if $val eq 'false';
-            return $val;
-        }
-        elsif ($try_key eq 'general') {
-            last;
-        }
-        else {
-            $try_key = $conf->{$try_key}->{inherit} || 'general';
-        }
-    }
-    return $conf->{$key} if $conf->{$key} && $conf->{$key} ne 'false';
-    return;
 }
 
 sub load_config {
@@ -445,3 +479,40 @@ Options:
      This help message.
 ];
 }
+
+package Conf;
+
+sub new {
+    my ($pk, %opt) = @_;
+    my $self = \%opt;
+    bless($self, (ref($pk) || $pk));
+    die "need both conf and format"
+        unless $self->{conf} && $self->{format};
+    return $self;
+}
+
+sub val {
+    # Gets the value of the given key
+    my ($self, $key) = @_;
+    my $conf = $self->{conf};
+    my $fmt = $self->{format};
+    my $val;
+    my $try_key = "format-$fmt";
+    while ($try_key) {
+        if (exists $conf->{$try_key}->{$key}) {
+            my $val = $conf->{$try_key}->{$key};
+            $val = undef if $val eq 'false';
+            return $val;
+        }
+        elsif ($try_key eq 'general') {
+            last;
+        }
+        else {
+            $try_key = $conf->{$try_key}->{inherit} || 'general';
+        }
+    }
+    return $conf->{$key} if $conf->{$key} && $conf->{$key} ne 'false';
+    return;
+}
+
+1;
