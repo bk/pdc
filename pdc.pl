@@ -108,17 +108,10 @@ sub get_commands {
     } else {
         push @$core_cmd, "-t", $format;
     }
-    # Turn on if we need two-stage conversion to pdf
-    # (in case of --biblatex/--natbib).
-    my $two_stage = 0;
     my $c = new Conf (format=>$fmt, conf=>$conf);
-    my $ext = $format eq 'pdf' ? 'pdf' : $c->val('extension');
-    my $pdfext = $c->val('pdf-extension') || 'pdf';
-    $ext ||= $format;
-    if ($format eq 'pdf' && ($c->val('biblatex') || $c->val('natbib'))) {
-        $ext = 'tmp.tex'; # so as not to conflict with possible separate latex doc
-        $two_stage = 1;
-    }
+
+    my ($ext, $pdfext, $two_stage) = get_file_extensions($c, $format);
+
     # Options directly corresponding to pandoc command-line args
     get_basic_pandoc_args($c, $core_cmd);
 
@@ -128,24 +121,12 @@ sub get_commands {
     # template
     get_template($c, $core_cmd, $fmt);
 
-    # output files (and dir)
-    my $output_file;
     # possibly override target filename
     my $trg = ($target_name || $conf->{target_name} || '');
     $mdfn = $trg if $trg;
-    if ($output_dir || ($conf->{'output-dir'} && $conf->{'output-dir'} ne 'false')) {
-        my $outputdir = $output_dir || $conf->{'output-dir'};
-        $outputdir = "$mddir$mdfn.pdc" if $outputdir eq 'auto';
-        unless (-d $outputdir) {
-            mkdir $outputdir or die "ERROR: Could not mkdir $outputdir: $!\n";
-        }
-        $output_file = "$outputdir/$mdfn.$ext";
-    } else {
-        $output_file = "$mddir/$mdfn.$ext";
-        die "ERROR: Refusing to overwrite existing $output_file when outputdir has not been specified\n"
-            if -f $output_file && !$conf->{overwrite};
-    }
-    push @$core_cmd, '-o', $output_file;
+
+    # Get output file (and possibly create output dir).
+    my $output_file = get_output_file($c, $core_cmd, $conf, $mddir, $mdfn, $ext);
 
     # preprocess + add input file(s) to core_cmd
     get_input_files_and_preprocess(
@@ -165,6 +146,41 @@ sub get_commands {
     get_generate_pdf($c, \@post_cmd, $fmt, $output_file, $ext, $pdfext);
 
     return (@pre_cmd, $core_cmd, @post_cmd);
+}
+
+sub get_file_extensions {
+    my ($c, $format) = @_;
+    # $two_stage is true if we need two-stage conversion to pdf
+    # because of --biblatex/--natbib.
+    my $two_stage = 0;
+    my $ext = $format eq 'pdf' ? 'pdf' : $c->val('extension');
+    my $pdfext = $c->val('pdf-extension') || 'pdf';
+    $ext ||= $format;
+    if ($format eq 'pdf' && ($c->val('biblatex') || $c->val('natbib'))) {
+        $ext = 'tmp.tex'; # so as not to conflict with possible separate latex doc
+        $two_stage = 1;
+    }
+    return ($ext, $pdfext, $two_stage);
+}
+
+sub get_output_file {
+    my ($c, $core_cmd, $conf, $mddir, $mdfn, $ext) = @_;
+    # output files (and dir)
+    my $output_file;
+    if ($output_dir || ($conf->{'output-dir'} && $conf->{'output-dir'} ne 'false')) {
+        my $outputdir = $output_dir || $conf->{'output-dir'};
+        $outputdir = "$mddir$mdfn.pdc" if $outputdir eq 'auto';
+        unless (-d $outputdir) {
+            mkdir $outputdir or die "ERROR: Could not mkdir $outputdir: $!\n";
+        }
+        $output_file = "$outputdir/$mdfn.$ext";
+    } else {
+        $output_file = "$mddir/$mdfn.$ext";
+        die "ERROR: Refusing to overwrite existing $output_file when outputdir has not been specified\n"
+            if -f $output_file && !$conf->{overwrite};
+    }
+    push @$core_cmd, '-o', $output_file;
+    return $output_file;
 }
 
 sub get_basic_pandoc_args {
