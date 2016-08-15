@@ -214,17 +214,20 @@ sub get_filters_etc {
     # Process filters, metadata and variables and add to core_cmd.
     my ($c, $core_cmd) = @_;
     my $filters = $c->val('filters') || [];
-    push @$filters, "pandoc-citeproc" if $c->val('citeproc');
     foreach my $filter (@$filters) {
         push @$core_cmd, "--filter=$filter";
     }
-    my $metadata = $c->val('metadata') || {};
+    if ($c->val('citeproc')) {
+        push @$filters, "pandoc-citeproc"
+            unless grep {/pandoc-citeproc/} @$filters;
+    }
+    my $metadata = $c->val('metadata', merge=>1) || {};
     foreach my $mk (keys %$metadata) {
         my $val = $metadata->{$mk};
         my $mval = defined $val && length($val) ? "$mk:$val" : $mk;
         push @$core_cmd, "--metadata=$mval";
     }
-    my $variables = $c->val('variables') || {};
+    my $variables = $c->val('variables', merge=>1) || {};
     foreach my $vk (keys %$variables) {
         my $val = $variables->{$vk};
         $val = undef if $val eq 'false';
@@ -422,7 +425,15 @@ sub merge_conf {
         if (ref $meta->{$k} eq 'HASH') {
             $conf->{$k} ||= {};
             foreach my $sk (keys %{$meta->{$k}}) {
-                $conf->{$k}->{$sk} = $meta->{$k}->{$sk};
+                # necessary for merging 'variables' and 'metadata' properly
+                if (ref $meta->{$k}->{$sk} eq 'HASH') {
+                    $conf->{$k}->{$sk} ||= {};
+                    foreach my $sk2 (keys %{ $meta->{$k}->{$sk} }) {
+                        $conf->{$k}->{$sk}->{$sk2} = $meta->{$k}->{$sk}->{$sk2};
+                    }
+                } else {
+                    $conf->{$k}->{$sk} = $meta->{$k}->{$sk};
+                }
             }
         } else {
             $conf->{$k} = $meta->{$k};
@@ -508,8 +519,14 @@ sub new {
 }
 
 sub val {
-    # Gets the value of the given key
-    my ($self, $key) = @_;
+    # Gets the value of the given key.
+    #
+    # If the 'merge' option is true, assume that the value is intended to be a
+    # hashref and collect keys into it while following the inheritance chain
+    # all the way up.
+    my ($self, $key, %opt) = @_;
+    my $merge = $opt{merge} || 0;
+    my $ret = $merge ? {} : undef;
     my $conf = $self->{conf};
     my $fmt = $self->{format};
     my $val;
@@ -518,7 +535,16 @@ sub val {
         if (exists $conf->{$try_key}->{$key}) {
             my $val = $conf->{$try_key}->{$key};
             $val = undef if $val eq 'false';
-            return $val;
+            if ($merge && ref $val eq 'HASH') {
+                foreach my $k (keys %$val) {
+                    $ret->{$k} = $val->{$k} unless exists $ret->{$k};
+                }
+                last if $try_key eq 'general';
+                $try_key = $conf->{$try_key}->{inherit};
+                $try_key ||= 'general';
+            } else {
+                return $val;
+            }
         }
         elsif ($try_key eq 'general') {
             last;
@@ -527,7 +553,25 @@ sub val {
             $try_key = $conf->{$try_key}->{inherit} || 'general';
         }
     }
-    return $conf->{$key} if $conf->{$key} && $conf->{$key} ne 'false';
+    if ($merge) {
+        # check toplevel (below 'general') -- although using it is sloppy
+        if (ref $conf->{$key} eq 'HASH') {
+            foreach my $k (keys %{ $conf->{$key} }) {
+                next if exists $ret->{$k};
+                my $val = $conf->{$key}->{$k};
+                $val = undef if $val eq 'false';
+                $ret->{$k} = $val;
+            }
+        }
+        # cleanup
+        foreach my $k (keys %$ret) {
+            $ret->{$k} = undef if $ret->{$k} eq 'false';
+        }
+        return $ret;
+    }
+    elsif ($conf->{$key} && $conf->{$key} ne 'false') {
+        return $conf->{$key};
+    }
     return;
 }
 
