@@ -180,6 +180,52 @@ Note the `m4-config` option here; it is merely a small trick for changing the qu
 
 If both `postprocess` and `generate-pdf` are present, all the steps specified in `postprocess` are called before pdf generation is attended to. One needs to be aware of this, because it means that if one wishes to do something special both *before* and *after* a PDF file is created one should turn `generate-pdf` off and instead do everything in `postprocess`. (Such was the case in the illustrative example for `postprocess` above).
 
+## Pandoc variables
+
+Pandoc has the concept of [variables](http://pandoc.org/MANUAL.html#variables-set-by-pandoc). In short, these are attributes which may be set in the meta block or from the command line, are visible to templates and may alter pandoc's behaviour with regard to specific output formats.
+
+When using `pdc`, these variables of course still work, but it is possible to set defaults for them in `defaults.yaml` or override them (perhaps for the purpose of differentiating between the settings for different output formats). The rules of precedence with regard to variables for the format `X` are as follows:
+
+1. If a variable is specified in `defaults.yaml` in the `variables` subsection of `general`, it is used when producing output of format `X` (and in fact of any format);
+2. *unless* it is overridden in `defaults.yaml` in the `variables` subsection of `format-X`;
+3. *unless* it is specified as a normal pandoc variable (i.e. outside the `pdc` section) in the topmost meta block of the document itself;
+4. *unless* it is specified inside the `pdc` section of the document meta block under the `variable` subkey of the `format-X` key.
+
+So, to take a somewhat contrived example, let's say we normally produce PDF documents with A4 page dimensions but for some reason need to make an exception in one case. We also wish to differentiate between the settings for LaTeX and ConTeXt, insofar as they overlap.
+
+In `defaults.yaml` we then might have:
+
+```yaml
+format-latex:
+    latex-engine: xelatex
+    variables:
+        papersize: a4
+        mainfont: Linux Libertine O
+        linkcolor: blue
+format-context:
+    variables:
+        papersize: a4
+        linkcolor: darkred
+```
+
+The relevant parts of the document's own meta block might look somewhat like this:
+
+```yaml
+papersize: letter
+mainfont: Garamond
+pdc:
+    formats: ['pdf', 'latex', 'context']
+    format-context:
+        variables:
+            papersize: a4
+            mainfont: Palatino
+```
+
+When producing `latex` and `pdf` documents, the output in this example will have Letter page dimensions and be set in the Garamond font, while the ConTeXt output will use A4 page dimensions and the Palatino font. Since `linkcolor` is not specified in the document itself, the value from `defaults.yaml` will be used unaltered.
+
+Note that there is some overlap between command line arguments and variables in pandoc. Command line arguments override variables of the same name set in the document meta block, while variables set on the command line override both. This behaviour is reflected in `pdc`, and may sometimes lead to unexpected results. There are four pre-defined pandoc variables which share a name with a command-line argument: `title`, `toc`, `bibliography, csl`. There are three further variables which have direct pandoc command-line equivalents although the names are not quite identical: `header-includes` (which corresponds to `--include-in-header`), `include-before` (corresponding to `--include-before-body`), and `include-after` (corresponding to `--include-after-body`).
+
+
 ## Copyright and license
 
 Copyright: Baldur A. Kristinsson, 2016 and later.
