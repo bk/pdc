@@ -146,7 +146,7 @@ general-latex:
     listings: false
     latex-engine: 'xelatex'
     latex-engine-opt: []
-    # If both biblatex and pdf are true, pdf is produced
+    # If either biblatex or generate-pdf is true, pdf is produced
     # in a separate step using latexmk, which needs to be in $PATH.
     biblatex: false
     natbib: false
@@ -159,39 +159,14 @@ format-beamer:
 
 format-latex:
     inherit: 'general-latex'
-    # Note that if you set any variables in the meta block, they will replace
-    # the whole 'variables' section rather than overriding each of these
-    # settings individually.
+    # Note that standard pandoc variables for LaTeX in the document metablock
+    # (also outside the pdc section) will override these options. Only define
+    # the keys you need to be *default* here.
+    # Documented at http://pandoc.org/MANUAL.html#variables-set-by-pandoc
     variables:
         papersize: a4
         fontsize: 12pt
         documentclass: article
-        classoption: oneside
         geometry: 'margin=3cm'
         linestretch: 1.25
-        fontfamily: ''
-        mainfont: ''
-        sansfont: ''
-        monofont: ''
-        mathfont: ''
-        CJKmainfont: ''
-        mainfontoptions: ''
-        sansfontoptions: ''
-        monofontoptions: ''
-        mathfontoptions: ''
-        CJKoptions: ''
-        fontenc: T1
-        colorlinks: false
-        linkcolor: ''
-        citecolor: ''
-        urlcolor: ''
-        toccolor: ''
-        links-as-notes: ''
-        indent: false
-        subparagraph: false
-        thanks: ''
-        secnumdepth: 0
-        lof: false
-        lot: false
         biblio-style: 'authoryear'
-        biblatexoptions: ''

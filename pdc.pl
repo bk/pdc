@@ -36,6 +36,25 @@ my %pandoc_args = (
             katex-stylesheet / ],
 );
 
+# If present in meta (outside the pdc section), these override all 'variables'
+# settings from defaults.yaml.
+my @pandoc_variables = qw/
+  title author date subtitle institute abstract keywords header-includes toc
+  toc-title include-before include-after body meta-json lang otherlangs dir
+  slidy-url slideous-url s5-url revealjs-url theme colortheme fonttheme
+  innertheme navigation section-titles papersize fontsize documentclass
+  classoption geometry margin-left margin-right margin-top linestretch
+  fontfamily fontfamilyoptions mainfont sansfont monofont CJKmainfont
+  mainfontoptions sansfontoptions monofontoptions mathfontoptions CJKoptions
+  fontenc colorlinks linkcolor citecolor urlcolor toccolor links-as-notes
+  indent subparagraph thanks toc toc-depth secnumdepth lof lot bibliography
+  biblio-style biblatexoptions layout contrastcolor linkstyle indenting
+  whitespace interlinespace headertext footertext pagenumbering section
+  header footer adjusting hyphenate
+/;
+# keeps track of variables specified in the meta block (see above)
+my %vars_in_meta = ();
+
 my $conf_dir = "$ENV{HOME}/.config/pdc";
 my $config_file = "$conf_dir/defaults.yaml";
 die "config file $config_file does not exist" unless -f $config_file;
@@ -229,6 +248,15 @@ sub get_filters_etc {
     }
     my $variables = $c->val('variables', merge=>1) || {};
     foreach my $vk (keys %$variables) {
+        # Whatever is defined in the meta section of the current document has
+        # precedence, even if it was defined outside the pdc section.
+        # Even the pdc section only has precedence for individual formats,
+        # so the normal attribute inheritance does not apply to variables
+        # defined there.
+        if (exists $vars_in_meta{$vk}) {
+            my $fmt = "format-" . $c->{format};
+            next unless $meta->{$fmt} && exists $meta->{$fmt}->{$vk};
+        }
         my $val = $variables->{$vk};
         $val = undef if $val eq 'false';
         my $vval = defined $val && length($val) ? "$vk:$val" : undef;
@@ -256,7 +284,6 @@ sub get_template {
 sub get_input_files_and_preprocess {
     # Adds input files to core_cmd, perhaps after a pre-processing stage.
     my ($c, $core_cmd, $pre_cmd, $post_cmd, $format, $mddir) = @_;
-
     my $preprocess = $c->val('preprocess-command');
     my $preprocess_args = $c->val('preprocess-args') || '';
     if ($preprocess) {
@@ -389,6 +416,10 @@ sub get_meta {
     close IN;
     if ($meta_block || $include_yaml) {
         my $meta = Load($meta_block) || {};
+        foreach my $var (@pandoc_variables) {
+            $vars_in_meta{$var} = $meta->{$var} if exists $meta->{$var};
+            $vars_in_meta{$var} = undef if $meta->{$var} eq 'false';
+        }
         my $pdc = $meta->{pdc} || {};
         if ($include_yaml) {
             $pdc->{include} ||= $include_yaml;
@@ -404,13 +435,6 @@ sub get_meta {
             push @{ $pdc->{_include} }, $inc;
             my $iconf = load_config($inc);
             $pdc = merge_conf($pdc, $iconf);
-        }
-        # special bibliography handling
-        for my $k (qw/bibliography csl/) {
-            if (exists $meta->{$k}) {
-                $pdc->{general}->{$k} = $meta->{$k}
-                    unless exists $pdc->{general}->{$k};
-            }
         }
         return $pdc;
     } else {
@@ -554,7 +578,9 @@ sub val {
         }
     }
     if ($merge) {
-        # check toplevel (below 'general') -- although using it is sloppy
+        # check toplevel (below 'general') -- although using it is sloppy, and
+        # will in any case only work for custom variables/metadata or if the
+        # normal variables have been entirely omitted from defaults.yaml.
         if (ref $conf->{$key} eq 'HASH') {
             foreach my $k (keys %{ $conf->{$key} }) {
                 next if exists $ret->{$k};
