@@ -58,6 +58,7 @@ my %vars_in_meta = ();
 my $conf_dir = "$ENV{HOME}/.config/pdc";
 my $config_file = "$conf_dir/defaults.yaml";
 die "config file $config_file does not exist" unless -f $config_file;
+my @css_search_path = ($conf_dir, "$ENV{HOME}/.pandoc/css", "$ENV{HOME}/.pandoc");
 
 # Global options
 my (@formats, $output_dir, $include_yaml, $target_name, $help);
@@ -131,8 +132,11 @@ sub get_commands {
 
     my ($ext, $pdfext, $two_stage) = get_file_extensions($c, $format);
 
+    # Get output file (and possibly create output dir).
+    my $output_file = get_output_file($c, $core_cmd, $conf, $mddir, $mdfn, $ext);
+
     # Options directly corresponding to pandoc command-line args
-    get_basic_pandoc_args($c, $core_cmd);
+    get_basic_pandoc_args($c, $core_cmd, $mddir);
 
     # filters, metadata, variables
     get_filters_etc($c, $core_cmd);
@@ -143,9 +147,6 @@ sub get_commands {
     # possibly override target filename
     my $trg = ($target_name || $conf->{target_name} || '');
     $mdfn = $trg if $trg;
-
-    # Get output file (and possibly create output dir).
-    my $output_file = get_output_file($c, $core_cmd, $conf, $mddir, $mdfn, $ext);
 
     # preprocess + add input file(s) to core_cmd
     get_input_files_and_preprocess(
@@ -183,6 +184,8 @@ sub get_file_extensions {
 }
 
 sub get_output_file {
+    # Adds the output file to core_cmd.
+    # Also makes sure the $output_dir global is set to the correct value.
     my ($c, $core_cmd, $conf, $mddir, $mdfn, $ext) = @_;
     # output files (and dir)
     my $output_file;
@@ -193,10 +196,12 @@ sub get_output_file {
             mkdir $outputdir or die "ERROR: Could not mkdir $outputdir: $!\n";
         }
         $output_file = "$outputdir/$mdfn.$ext";
+        $output_dir = $outputdir;
     } else {
         $output_file = "$mddir/$mdfn.$ext";
         die "ERROR: Refusing to overwrite existing $output_file when outputdir has not been specified\n"
             if -f $output_file && !$conf->{overwrite};
+        $output_dir = $mddir;
     }
     push @$core_cmd, '-o', $output_file;
     return $output_file;
@@ -205,7 +210,7 @@ sub get_output_file {
 sub get_basic_pandoc_args {
     # Assembles the arguments directly corresponding to pandoc command-line switches.
     # Called by get_commands.
-    my ($c, $core_cmd) = @_;
+    my ($c, $core_cmd, $mddir) = @_;
     # common switches
     foreach my $ss (@{$pandoc_args{simple_switches}}) {
         my $val = $c->val($ss);
@@ -222,11 +227,27 @@ sub get_basic_pandoc_args {
     foreach my $param (@{$pandoc_args{params}}) {
         my $val = $c->val($param);
         next unless $val;
+        if ($param eq 'css' && $c->val('self-contained')) {
+            $val = expand_css_path($val, $mddir);
+        }
         $val = [$val] unless ref $val eq 'ARRAY';
         foreach my $v (@$val) {
             push @$core_cmd, "--$param=$v";
         }
     }
+}
+
+sub expand_css_path {
+    my ($css, $input_dir) = @_;
+    # Don't search for the file unless it contains no directory spec
+    return $css if $css =~ /\//;
+    # Don't alter the path if the file is found in $input_dir
+    return $css if -f $input_dir . $css;
+    foreach my $dir (@css_search_path) {
+        return "$dir/$css" if -f "$dir/$css";
+    }
+    # Give up and let pandoc deal with the mess. (Hint: it won't).
+    return $css;
 }
 
 sub get_filters_etc {
