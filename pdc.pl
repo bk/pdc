@@ -6,6 +6,8 @@ use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
 use Getopt::Long;
 
+my $VERSION = '0.1';
+
 #### PRELIMINARIES
 
 my %pandoc_args = (
@@ -445,7 +447,6 @@ sub get_meta {
         if ($include_yaml) {
             $pdc->{include} ||= $include_yaml;
         }
-        $pdc->{general} ||= {};
         # follow potential chain of includes.
         my %loaded = ();
         while ($pdc->{include}) {
@@ -460,12 +461,19 @@ sub get_meta {
         return $pdc;
     } else {
         warn "WARNING: No meta block at start of document - using defaults only\n";
-        return {general=>{}};
+        return {};
     }
 }
 
 sub merge_conf {
     my ($meta, $conf) = @_;
+    # For backwards compatibility with pre-v0.1:
+    if (exists $meta->{general}) {
+        foreach my $k (keys %{ $meta->{general} }) {
+            $meta->{$k} = $meta->{general}->{$k} unless exists $meta->{$k};
+        }
+        delete $meta->{general};
+    }
     foreach my $k (keys %$meta) {
         if (ref $meta->{$k} eq 'HASH') {
             $conf->{$k} ||= {};
@@ -522,7 +530,7 @@ sub shellescape_filename {
 sub usage {
     my $prog_name = $0;
     $prog_name =~ s/.*\///;
-    return qq[$prog_name - Pandoc wrapper script
+    return qq{$prog_name [v$VERSION] - Pandoc wrapper script
 
 Usage: $prog_name [OPTIONS] FILES
 
@@ -549,7 +557,7 @@ Options:
   -h or --help
 
      This help message.
-];
+};
 }
 
 package Conf;
@@ -584,24 +592,18 @@ sub val {
                 foreach my $k (keys %$val) {
                     $ret->{$k} = $val->{$k} unless exists $ret->{$k};
                 }
-                last if $try_key eq 'general';
                 $try_key = $conf->{$try_key}->{inherit};
-                $try_key ||= 'general';
-            } else {
+            }
+            else {
                 return $val;
             }
         }
-        elsif ($try_key eq 'general') {
-            last;
-        }
         else {
-            $try_key = $conf->{$try_key}->{inherit} || 'general';
+            $try_key = $conf->{$try_key}->{inherit};
         }
     }
     if ($merge) {
-        # check toplevel (below 'general') -- although using it is sloppy, and
-        # will in any case only work for custom variables/metadata or if the
-        # normal variables have been entirely omitted from defaults.yaml.
+        # check toplevel:
         if (ref $conf->{$key} eq 'HASH') {
             foreach my $k (keys %{ $conf->{$key} }) {
                 next if exists $ret->{$k};

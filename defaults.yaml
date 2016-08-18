@@ -1,4 +1,4 @@
-# TOP-LEVEL SETTINGS
+# TOP-LEVEL SETTINGS (formats, output-dir, overwrite, include, preprocess-*)
 
 # Which output formats to turn on; valid are all output formats supported by
 # pandoc, as well as 'pdf' (meaning latex with pdf conversion). Overridable
@@ -22,7 +22,7 @@ overwrite: false
 include: ''
 
 # Preprocessing support. It can be overridden by placing these directives
-# it in specific sections, whether 'general' or 'format-*'.
+# in specific 'format-*' sections.
 # Both directives are strings and may contain spaces.
 # Examples of preprocess-command:
 #   'm4', 'gpp -H -Imacros.gpp', 'm4 -P ~/.config/pdc/macros.m4 -'
@@ -31,68 +31,76 @@ preprocess-command: ''
 preprocess-args: ''
 
 # GENERAL OPTIONS, applicable to the reader or to multiple writers.
-# Overridable and extensible through ('general-*' and) 'format-*' options in
-# the document meta block or in included yaml files. Note that 'pdf' format
-# uses general-latex and format-latex settings.
-general:
-    # READER options:
-    parse-raw: false
-    smart: true
-    old-dashes: false
-    base-header-level: 1
-    indented-code-classes: ''
-    default-image-extension: ''
-    file-scope: true
-    # Output filters (besides pandoc-citeproc); note that this is a list
-    # a list for potentially repeated '--filter X' parameters.
-    filters: []
-    # Metadata dict. This overrides document metadata but is
-    # in turn overridden by format-* metadata.
-    metadata: {}
-    normalize: true
-    preserve-tabs: false
-    tab-stop: 4
-    # Omitted as not relevant for markdown input: track-changes, extract-media
-    #
-    # WRITER options:
-    standalone: true
-    # Template-basename is only used if template is not specified
-    # and ~/.pandoc/templates/${template_basename}.${format} is found.
-    template-basename: ''
-    # Potentially repeated -V parameters
-    variables: {}
-    # omitted: -D, --print-default-data-file
-    dpi: 96
-    wrap: auto
-    columns: 78
-    toc: false
-    toc-depth: 3
-    no-highlight: false
-    highlight-style: pygments
-    include-in-header: []
-    include-before-body: []
-    include-after-body: []
-    # for html, latex, docbook, epub
-    chapters: false
-    number-sections: false
-    # for markdown, rst, asciidoc output
-    atx-headers: false
-    reference-links: false
-    # for slide formats
-    incremental: false
-    slide-level: 0
-    # Citations - see also under general-latex. Note that 'citeproc'
-    # does not directly correspond to a pandoc command-line argument,
-    # but is an alias for adding 'pandoc-citeproc' to 'filters'.
-    citeproc: true
-    csl: ''
-    bibliography: ''
+# Overridable and extensible in the document meta block or in included yaml files,
+# at this level or inside 'format-*' sections. Note that 'pdf' format
+# uses format-latex settings.
+#
+
+# READER options:
+parse-raw: false
+smart: true
+old-dashes: false
+base-header-level: 1
+indented-code-classes: ''
+default-image-extension: ''
+file-scope: true
+# Output filters (besides pandoc-citeproc); note that this is a list
+# a list for potentially repeated '--filter X' parameters.
+filters: []
+# Metadata dict. This overrides document metadata but is
+# in turn overridden by format-* metadata.
+# metadata: {}
+normalize: true
+preserve-tabs: false
+tab-stop: 4
+# Omitted as not relevant for markdown input: track-changes, extract-media
+#
+# WRITER options:
+standalone: true
+# Template-basename is only used if template is not specified
+# and ~/.pandoc/templates/${template_basename}.${format} is found.
+template-basename: ''
+# Potentially repeated -V parameters
+# variables: {}
+# omitted: -D, --print-default-data-file
+dpi: 96
+wrap: auto
+columns: 78
+toc: false
+toc-depth: 3
+no-highlight: false
+highlight-style: pygments
+include-in-header: []
+include-before-body: []
+include-after-body: []
+# for html, latex, docbook, epub
+chapters: false
+number-sections: false
+# for markdown, rst, asciidoc output
+atx-headers: false
+reference-links: false
+# for slide formats
+incremental: false
+slide-level: 0
+# Citations - see also under format-latex and format-beamer. Note that
+# 'citeproc' does not directly correspond to a pandoc command-line argument,
+# but is an alias for adding 'pandoc-citeproc' to 'filters'.
+citeproc: false
+csl: ''
+bibliography: ''
+
+#
+# FORMAT-* SECTIONS
+#
 
 # Default options intended for html, html5, as well as revealjs and other
 # html-based slides formats. Note that format-html, etc. do not inherit from
 # this automatically but have to explicitly point to it using the 'inherit'
 # key.
-general-html:
+format-html5:
+    # 'extension' is overridden in format-html and format-epub,
+    # which inherit these settings
+    extension: 'html'
     self-contained: false
     html-q-tags: false
     ascii: false
@@ -114,20 +122,19 @@ general-html:
     katex-stylesheet: ''
 
 format-html:
-    inherit: 'general-html'
+    inherit: 'html5'
     extension: 'htm'
 
-format-html5:
-    inherit: 'general-html'
-    extension: 'html'
-
-format-epub:
-    inherit: 'general-html'
+format-epub3:
+    inherit: 'html5'
     epub-stylesheet: ''
     epub-cover-image: ''
     epub-metadata: ''
     epub-embed-font: ''
     epub-chapter-level: 1
+
+format-epub:
+    inherit: 'epub3'
 
 format-odt:
     reference-odt: ''
@@ -135,10 +142,14 @@ format-odt:
 format-docx:
     reference-docx: ''
 
-general-latex:
-    # If true, generate pdf in a separate step. Also makes it possible
-    # to generate pdf for beamer but not normal latex output, and without
-    # specifying 'pdf' in top-level formats.
+format-latex:
+    # Note that 'format-latex' applies to normal PDF generation
+    # (with 'pdf' in 'formats').
+    #
+    # If 'generate-pdf' is true, generate pdf in a separate step.
+    # (The normal way of generating pdf is to set this as false but
+    # to specify 'pdf' in 'formats'. This setting is intended for beamer
+    # and for postprocessed latex).
     generate-pdf: false
     extension: 'tex'
     pdf-extension: 'pdf'
@@ -146,19 +157,10 @@ general-latex:
     listings: false
     latex-engine: 'xelatex'
     latex-engine-opt: []
-    # If either biblatex or generate-pdf is true, pdf is produced
-    # in a separate step using latexmk, which needs to be in $PATH.
+    # If either biblatex or natbib is true, pdf (if specified in 'formats')
+    # is produced in a separate step using latexmk, which needs to be in $PATH.
     biblatex: false
     natbib: false
-
-format-beamer:
-    inherit: 'general-latex'
-    extension: 'beamer.tex'
-    generate-pdf: true
-    pdf-extension: 'beamer.pdf'
-
-format-latex:
-    inherit: 'general-latex'
     # Note that standard pandoc variables for LaTeX in the document metablock
     # (also outside the pdc section) will override these options. Only define
     # the keys you need to be *default* here.
@@ -170,3 +172,26 @@ format-latex:
         geometry: 'margin=3cm'
         linestretch: 1.25
         biblio-style: 'authoryear'
+
+format-beamer:
+    generate-pdf: true
+    extension: 'beamer.tex'
+    pdf-extension: 'beamer.pdf'
+    no-tex-ligatures: false
+    listings: false
+    latex-engine: 'xelatex'
+    latex-engine-opt: []
+    biblatex: false
+    natbib: false
+
+
+### UNCONFIGURED FORMATS
+###
+### The following output formats do not currently have their own format-*
+### section:
+###
+### asciidoc commonmark context docbook docbook5 dokuwiki dzslides fb2,
+### haddock, icml, man, markdown, markdown_github, markdown_mmd,
+### markdown_phpextra, markdown_strict, mediawiki, native, opendocument,
+### opml, org, plain, revealjs, rst, rtf, s5, slideous, slidy, tei, texinfo,
+### textile, zimwiki
