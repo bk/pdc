@@ -199,6 +199,12 @@ Note that there is some overlap between command line arguments and variables in 
 * There are three further variables which have direct pandoc command-line equivalents although the names are not quite identical: `header-includes` (which corresponds to `--include-in-header`), `include-before` (corresponding to `--include-before-body`), and `include-after` (corresponding to `--include-after-body`).
 
 
+## Compatibility
+
+`pdc` was originally written for Pandoc version 1.17 and may not work with earlier versions.
+
+It is compatible with Pandoc version 2.x (2.1.1 at the time of writing) but (as yet) does not fully support options added or changed since the 1.x series.
+
 ## Copyright and license
 
 Copyright: Baldur A. Kristinsson, 2016 and later.

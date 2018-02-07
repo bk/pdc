@@ -6,7 +6,7 @@ use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
 use Getopt::Long;
 
-my $VERSION = '0.1';
+my $VERSION = '0.2';
 
 #### PRELIMINARIES
 
@@ -35,7 +35,7 @@ my %pandoc_args = (
             css reference-odt reference-docx epub-stylesheet epub-cover-image
             epub-metadata epub-embed-font epub-chapter-level latex-engine
             latex-engine-opt bibliography csl citation-abbreviations
-            katex-stylesheet / ],
+            katex-stylesheet pdf-engine pdf-engine-opt / ],
 );
 
 # If present in meta (outside the pdc section), these override all 'variables'
@@ -123,6 +123,10 @@ sub get_commands {
     my @pre_cmd = ();
     # TODO: maybe make it possible to set list of markdown extensions, or
     # markdown base variant + extensions?
+    my @version_info = qx/pandoc --version/ or die "error running pandoc: $!";
+    my $version = $1 if @version_info && $version_info[0] =~ /^pandoc\s+([\d\.]+)/;
+    $version ||= '0';
+    my $major_version = $1 if $version =~ /^\D*(\d)/;
     my $core_cmd = ['pandoc', '-f', 'markdown'];
     my @post_cmd = ();
     if ($format eq 'pdf') {
@@ -130,7 +134,8 @@ sub get_commands {
     } else {
         push @$core_cmd, "-t", $format;
     }
-    my $c = new Conf (format=>$fmt, conf=>$conf);
+    my $c = new Conf (format=>$fmt, conf=>$conf,
+                      version=>$major_version, full_version=>$version);
 
     my ($ext, $pdfext, $two_stage) = get_file_extensions($c, $format);
 
@@ -213,10 +218,15 @@ sub get_basic_pandoc_args {
     # Assembles the arguments directly corresponding to pandoc command-line switches.
     # Called by get_commands.
     my ($c, $core_cmd, $mddir) = @_;
+    my %only_v1_switches = qw/normalize 1 smart 1/;
+    my %v1_to_v2_repl = qw/latex- pdf-/;
+
     # common switches
     foreach my $ss (@{$pandoc_args{simple_switches}}) {
         my $val = $c->val($ss);
-        push @$core_cmd, "--$ss" if $val;
+        if ($val) {
+            push @$core_cmd, "--$ss" unless $only_v1_switches{$ss} && $c->is_v2;
+        }
     }
     foreach my $ma (@{$pandoc_args{mixed_args}}) {
         my $val = $c->val($ma);
@@ -228,13 +238,17 @@ sub get_basic_pandoc_args {
     }
     foreach my $param (@{$pandoc_args{params}}) {
         my $val = $c->val($param);
+        my $param_name = $param;
+        if ($param_name =~ /^latex-/ && $c->is_v2) {
+            $param_name =~ s/^latex/pdf/;
+        }
         next unless $val;
-        if ($param eq 'css' && $c->val('self-contained')) {
+        if ($param_name eq 'css' && $c->val('self-contained')) {
             $val = expand_css_path($val, $mddir);
         }
         $val = [$val] unless ref $val eq 'ARRAY';
         foreach my $v (@$val) {
-            push @$core_cmd, "--$param=$v";
+            push @$core_cmd, "--$param_name=$v";
         }
     }
 }
@@ -623,5 +637,12 @@ sub val {
     }
     return;
 }
+
+sub version {
+    my ($self, $full) = @_;
+    return $full ? $self->{full_version} : $self->{version}
+}
+
+sub is_v2 { shift->version == 2 }
 
 1;

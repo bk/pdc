@@ -38,6 +38,8 @@ preprocess-args: ''
 
 # READER options:
 parse-raw: false
+# NOTE: 'smart' is ignored when using Pandoc v 2.0 or later.
+#       (It is NOT automatically transformed to a format extension)
 smart: true
 old-dashes: false
 base-header-level: 1
@@ -50,6 +52,7 @@ filters: []
 # Metadata dict. This overrides document metadata but is
 # in turn overridden by format-* metadata.
 # metadata: {}
+# NOTE: 'normalize' is ignored when using Pandoc v 2.0 or later.
 normalize: true
 preserve-tabs: false
 tab-stop: 4
@@ -155,6 +158,8 @@ format-latex:
     pdf-extension: 'pdf'
     no-tex-ligatures: false
     listings: false
+    # NOTE: latex-engine and latex-engine-opt are automatically changed
+    #       to pdf-engine and pdf-engine-opt when using Pandoc v 2.x
     latex-engine: 'xelatex'
     latex-engine-opt: []
     # If either biblatex or natbib is true, pdf (if specified in 'formats')
@@ -179,6 +184,8 @@ format-beamer:
     pdf-extension: 'beamer.pdf'
     no-tex-ligatures: false
     listings: false
+    # NOTE: latex-engine and latex-engine-opt are automatically changed
+    #       to pdf-engine and pdf-engine-opt when using Pandoc v 2.x
     latex-engine: 'xelatex'
     latex-engine-opt: []
     biblatex: false
