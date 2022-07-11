@@ -6,71 +6,88 @@ use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
 use Getopt::Long;
 
-my $VERSION = '0.2';
+my $VERSION = '0.3';
 
 #### PRELIMINARIES
 
 my %pandoc_args = (
     # These are either turned on or off
     'simple_switches' => [
-        qw/ parse-raw smart old-dashes normalize preserve-tabs file-scope
-            standalone toc no-highlight self-contained html-q-tags ascii
-            reference-links atx-headers chapters number-sections
-            no-tex-ligatures listings incremental section-divs natbib biblatex
-            gladtex / ],
+        qw/
+            file-scope sandbox standalone ascii toc table-of-contents
+            number-sections no-highlight preserve-tabs self-contained
+            no-check-certificate strip-empty-paragraphs strip-comments
+            reference-links atx-headers listings incremental section-divs
+            html-q-tags citeproc natbib biblatex mathml gladtex trace
+            dump-args ignore-args verbose quiet fail-if-warnings
+          / ],
 
     # These may be used as booleans but can also take an URL argument
     'mixed_args' => [
-        qw/ latexmathml asciimathml mathml mimetex webtex jsmath
-            mathjax katex / ],
+        qw/ webtex mathjax katex / ],
 
-    # These take a parameter in all cases (filter, metadata, variable
+    # These take a parameter in all cases (filter, lua-filter, metadata, variable
     # are all handled specially)
     'params' => [
-        qw/ data-dir base-header-level indented-code-classes tab-stop
-            track-changes extract-media template dpi wrap columns toc-depth
-            highlight-style include-in-header include-before-body
-            include-after-body number-offset slide-level
-            default-image-extension email-obfuscation id-prefix title-prefix
-            css reference-odt reference-docx epub-stylesheet epub-cover-image
-            epub-metadata epub-embed-font epub-chapter-level latex-engine
-            latex-engine-opt bibliography csl citation-abbreviations
-            katex-stylesheet pdf-engine pdf-engine-opt / ],
+        qw/
+            data-dir defaults template wrap toc-depth number-offset
+            top-level-division extract-media resource-path include-in-header
+            include-before-body include-after-body highlight-style
+            syntax-definition dpi eol columns tab-stop pdf-engine pdf-engine-opt
+            reference-doc request-header abbreviations indented-code-classes
+            default-image-extension shift-heading-level-by base-header-level
+            track-changes reference-location markdown-headings slide-level
+            email-obfuscation id-prefix title-prefix css epub-subdirectory
+            epub-cover-image epub-metadata epub-embed-font epub-chapter-level
+            ipynb-output bibliography csl citation-abbreviations log
+          / ],
 );
 
 # If present in meta (outside the pdc section), these override all 'variables'
 # settings from defaults.yaml.
 my @pandoc_variables = qw/
-  title author date subtitle institute abstract keywords header-includes toc
-  toc-title include-before include-after body meta-json lang otherlangs dir
-  slidy-url slideous-url s5-url revealjs-url theme colortheme fonttheme
-  innertheme navigation section-titles papersize fontsize documentclass
-  classoption geometry margin-left margin-right margin-top linestretch
-  fontfamily fontfamilyoptions mainfont sansfont monofont CJKmainfont
-  mainfontoptions sansfontoptions monofontoptions mathfontoptions CJKoptions
-  fontenc colorlinks linkcolor citecolor urlcolor toccolor links-as-notes
-  indent subparagraph thanks toc toc-depth secnumdepth lof lot bibliography
-  biblio-style biblatexoptions layout contrastcolor linkstyle indenting
-  whitespace interlinespace headertext footertext pagenumbering section
-  header footer adjusting hyphenate
+    abstract abstract-title adjusting aspectratio author backgroundcolor
+    beamerarticle beameroption biblatexoptions bibliography biblio-style
+    biblio-title block-headings body category citecolor CJKmainfont
+    CJKoptions classoption colorlinks colortheme contrastcolor
+    curdir date date-meta description dir documentclass document-css
+    filecolor fontcolor fontenc fontfamily fontfamilyoptions fontsize
+    fonttheme footer footer-html footertext geometry header header-html
+    header-includes headertext hyperrefoptions hyphenate include-after
+    include-before includesource indent indenting innertheme institute
+    interlinespace keywords lang layout lineheight linestretch
+    linkcolor links-as-notes linkstyle lof logo lot mainfont
+    mainfontoptions margin-bottom margin-left margin-right margin-top
+    margin-top-margin-bottom mathfont meta-json microtypeoptions
+    monobackgroundcolor monofont monofontoptions natbiboptions
+    navigation numbersections outertheme outputfile pagenumbering
+    pagestyle papersize pdfa pdfaiccprofile pdfaintent pointsize
+    revealjs-url s5-url sansfont sansfontoptions secnumdepth section
+    section-titles slideous-url slidy-url sourcefile subject subtitle
+    thanks theme themeoptions title titlegraphic title-slide-attributes
+    toc toccolor toc-depth toc-title urlcolor
 /;
 # keeps track of variables specified in the meta block (see above)
 my %vars_in_meta = ();
 
 my $conf_dir = "$ENV{HOME}/.config/pdc";
-my $config_file = "$conf_dir/defaults.yaml";
-die "config file $config_file does not exist" unless -f $config_file;
-my @css_search_path = ($conf_dir, "$ENV{HOME}/.pandoc/css", "$ENV{HOME}/.pandoc");
+my @css_search_path = ($conf_dir,
+                       "$ENV{HOME}/.local/share/pandoc/css",
+                       "$ENV{HOME}/.local/share/pandoc",
+                       "$ENV{HOME}/.pandoc/css",
+                       "$ENV{HOME}/.pandoc");
 
 # Global options
-my (@formats, $output_dir, $include_yaml, $target_name, $help);
+my (@formats, $config_file, $output_dir, $include_yaml, $target_name, $help);
 GetOptions ("to|formats|t:s" => \@formats,
+            "config|c:s" => \$config_file,
             "output-dir|d:s" => \$output_dir,
             "include-yaml|i:s" => \$include_yaml,
             "target-name|n:s" => \$target_name,
             "help|h" => \$help);
 die usage() if $help;
 @formats = split(/,/, join(',',@formats));
+$config_file ||= "$conf_dir/defaults.yaml";
 check_options();
 
 my @mdfiles = @ARGV or die "ERROR: Need at least one markdown file as parameter\n";
@@ -86,6 +103,7 @@ my $meta = get_meta($mdfiles[0]);
 my $conf = load_config($config_file);
 $conf = merge_conf($meta, $conf);
 $conf->{formats} = \@formats if @formats;
+$conf->{formats} ||= ['html5'];
 
 # If both 'pdf' and 'latex' are in formats,
 # 'generate-pdf' in 'format-latex' would be superfluous.
@@ -119,7 +137,7 @@ sub get_commands {
     my ($mdfn, $mddir, $input_ext) = fileparse($mdfiles[0], $iext);
     $mddir ||= './';
     $mddir .= '/' unless $mddir =~ /\/$/;
-    my $fmt = $format eq 'pdf' ? 'latex' : $format;
+    my $fmt = $format eq 'pdf' ? target_pdf_format($conf) : $format;
     my @pre_cmd = ();
     # TODO: maybe make it possible to set list of markdown extensions, or
     # markdown base variant + extensions?
@@ -127,13 +145,10 @@ sub get_commands {
     my $version = $1 if @version_info && $version_info[0] =~ /^pandoc\s+([\d\.]+)/;
     $version ||= '0';
     my $major_version = $1 if $version =~ /^\D*(\d)/;
-    my $core_cmd = ['pandoc', '-f', 'markdown'];
+    my $source_format = $conf->{'source-format'} || $conf->{'from'} || 'markdown';
+    my $core_cmd = ['pandoc', '-f', $source_format];
     my @post_cmd = ();
-    if ($format eq 'pdf') {
-        push @$core_cmd, "-t", "latex";
-    } else {
-        push @$core_cmd, "-t", $format;
-    }
+    push @$core_cmd, "-t", $fmt;
     my $c = new Conf (format=>$fmt, conf=>$conf,
                       version=>$major_version, full_version=>$version);
 
@@ -173,6 +188,28 @@ sub get_commands {
     get_generate_pdf($c, \@post_cmd, $fmt, $output_file, $ext, $pdfext);
 
     return (@pre_cmd, $core_cmd, @post_cmd);
+}
+
+sub target_pdf_format {
+    # NOTE: quite sensitive to pandoc version.
+    my $conf = shift;
+    my %eng2fmt = (
+        'pdflatex' => 'latex',
+        'lualatex' => 'latex',
+        'xelatex' => 'latex',
+        'latexmk' => 'latex',
+        'tectonic' => 'latex',
+        'context' => 'context',
+        'wkhtmltopdf' => 'html',
+        'weasyprint' => 'html',
+        'pagedjs-cli' => 'html',
+        'prince' => 'html',
+        'pdfroff' => 'ms',
+        );
+    my $eng = $conf->{'format-pdf'} ? $conf->{'format-pdf'}->{'pdf-engine'} : $conf->{'pdf-engine'};
+    $eng ||= 'xelatex';
+    my $fmt = $eng2fmt{$eng} || 'latex';
+    return $fmt;
 }
 
 sub get_file_extensions {
@@ -270,12 +307,12 @@ sub get_filters_etc {
     # Process filters, metadata and variables and add to core_cmd.
     my ($c, $core_cmd) = @_;
     my $filters = $c->val('filters') || [];
+    my $lua_filters = $c->val('lua-filters') || [];
     foreach my $filter (@$filters) {
         push @$core_cmd, "--filter=$filter";
     }
-    if ($c->val('citeproc')) {
-        push @$filters, "pandoc-citeproc"
-            unless grep {/pandoc-citeproc/} @$filters;
+    foreach my $lfil (@$lua_filters) {
+        push @$core_cmd, "--lua-filter=$lfil";
     }
     my $metadata = $c->val('metadata', merge=>1) || {};
     foreach my $mk (keys %$metadata) {
@@ -353,7 +390,7 @@ sub maybe_biblatex_natbib {
     my ($c, $post_cmd, $output_file) = @_;
     # This is triggered in case of --biblatex or --natbib
     my $latexmk = ['latexmk', '-cd', '-quiet', '-silent'];
-    my $engine = $c->val('latex-engine');
+    my $engine = $c->val('pdf-engine');
     if ($engine) {
         push @$latexmk, ($engine eq 'pdflatex' ? '-pdf' : "-$engine");
     }
@@ -386,7 +423,7 @@ sub get_generate_pdf {
     # generate-pdf config option
     my ($c, $post_cmd, $fmt, $output_file, $ext, $pdfext) = @_;
     my $generate_pdf = $c->val('generate-pdf');
-    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?)$/ && $ext !~ /pdf/) {
+    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?|ms)$/ && $ext !~ /pdf/) {
         my $pdf_output_file = $output_file;
         $pdf_output_file =~ s/$ext$/$pdfext/;
         my (@cmd, @cleanup);
@@ -395,20 +432,26 @@ sub get_generate_pdf {
             my @opts = ();
             foreach my $side (qw/top right bottom left/) {
                 my $k = "margin-$side";
-                push(@opts, "--$k", $vars->{$k}) if $vars->{$k};
+                push(@opts, "--$k", ($vars->{$k}||"25mm"));
             }
             push(@opts, '--page-size', $vars->{papersize}) if $vars->{papersize};
+            # TODO: respect pdf-engine and pdf-engine-opt
             @cmd = ('wkhtmltopdf', @opts, $output_file, $pdf_output_file);
         }
         elsif ($fmt eq 'context') {
             push @cmd, qw/context --batchmode --purge --result/;
             push @cmd, $pdf_output_file, $output_file;
         }
+        elsif ($fmt eq 'ms') {
+            push @cmd, qw/pdfroff -ms -pdfmark -mspdf -e -t -k -KUTF-8/;
+            push @cmd, "--pdf-output=$pdf_output_file";
+            push @cmd, $output_file;
+        }
         else {
             push @cmd, qw/latexmk -cd -silent/;
-            my $eng = $c->val('latex-engine') || 'xelatex';
+            my $eng = $c->val('pdf-engine') || 'xelatex';
             $eng = 'pdf' if $eng eq 'pdflatex';
-            # TODO: handle latex-engine-opt
+            # TODO: handle pdf-engine-opt
             push @cmd, "-$eng";
             push @cmd, $output_file;
             @cleanup = (qw/latexmk -cd -c/, $output_file);
@@ -416,7 +459,7 @@ sub get_generate_pdf {
         push @$post_cmd, \@cmd;
         push @$post_cmd, \@cleanup if @cleanup;
     }
-    elsif ($generate_pdf) {
+    elsif ($generate_pdf && $ext !~ /pdf/) {
         warn "WARNING: generate-pdf option not supported for format $fmt -- skipping\n";
     }
 }
@@ -472,10 +515,39 @@ sub get_meta {
             my $iconf = load_config($inc);
             $pdc = merge_conf($pdc, $iconf);
         }
+        interpolate_env($pdc);
         return $pdc;
     } else {
         warn "WARNING: No meta block at start of document - using defaults only\n";
         return {};
+    }
+}
+
+sub interpolate_env {
+    # Replace strings like '${HOME}' with environment variables.
+    # Also handles the special variable USERDATA.
+    # This is similar to Pandoc defaults files (-D switch).
+    my $c = shift;
+    my $userdata = "$ENV{HOME}/.local/share/pandoc";
+    if (-d "$ENV{HOME}/.pandoc" && !-e $userdata) {
+        $userdata = "$ENV{HOME}/.pandoc";
+    }
+    foreach my $k (keys %$c) {
+        if (ref $c->{$k} eq 'HASH') {
+            interpolate_env($c->{$k});
+        }
+        elsif (ref $c->{$k} eq 'ARRAY') {
+            foreach my $v (@{$c->{$k}}) {
+                if ($v && !ref($v)) {
+                    $v =~ s/\$\{USERDATA\}/$userdata/g;
+                    $v =~ s/\$\{(\w+)\}/$ENV{$1}/g;
+                }
+            }
+        }
+        elsif ($c->{$k} && ! ref($c->{$k})) {
+            $c->{$k} =~ s/\$\{USERDATA\}/$userdata/g;
+            $c->{$k} =~ s/\$\{(\w+)\}/$ENV{$1}/g;
+        }
     }
 }
 
@@ -511,6 +583,10 @@ sub merge_conf {
 
 sub check_options {
     # @formats are not checked
+    if (!-f $config_file && -f "$conf_dir/$config_file") {
+        $config_file = "$conf_dir/$config_file";
+    }
+    die "config file $config_file does not exist" unless -f $config_file;
     if ($output_dir) {
         die "ERROR: output dir $output_dir (or its parent_directory) does not exist\n"
             unless output_dir_ok($output_dir);
@@ -550,6 +626,12 @@ Usage: $prog_name [OPTIONS] FILES
 
 Options:
 
+  -c YAML_FILE or --config=YAML_FILE
+
+    Specify main config file. The default is ~/.config/pdc/defaults.yaml.
+    This file must exist. A file name without a leading directory path will
+    be looked for first in the working directory and then in ~/.config/pdc/.
+
   -t FORMAT or --to=FORMAT or --formats=FORMAT
 
     Output format override. May be repeated, e.g. '--to pdf --to html',
@@ -570,7 +652,7 @@ Options:
 
   -h or --help
 
-     This help message.
+    This help message.
 };
 }
 

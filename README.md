@@ -18,7 +18,7 @@ Some configuration options, notably turning on `--biblatex` or `--natbib` when p
 
 ## Usage
 
-In order to process a Markdown document (e.g. `myfile.md`) with `pdc`, simply run `pdc myfile.md`. Assuming that you have not changed the default settings and not overriden the default behaviour through command line arguments (for which see below), a subdirectory called `myfile.pdc` will be created in the same directory as `myfile.md`, and output files for three formats (pdf, latex and html5) will be placed there.
+In order to process a Markdown document (e.g. `myfile.md`) with `pdc`, simply run `pdc myfile.md`. Assuming that you have not changed the default settings and not overriden the default behaviour through command line arguments (for which see below), a subdirectory called `myfile.pdc` will be created in the same directory as `myfile.md`, and output files for three formats (pdf, latex and html) will be placed there.
 
 Like with pandoc, you can also specify multiple source files which together will be turned into a single target document for each of the configured formats. However, unlike pandoc, `pdc` does not read markdown source from STDIN, so do not attempt to pipe data to it.
 
@@ -77,9 +77,9 @@ format-epub:
 as we saw above, while Engels's version of this file perhaps might look like this:
 
 ```yaml
-formats: ['html5', 'epub']
+formats: ['html', 'epub']
 format-html5:
-    template: engels_blog.html5
+    template: engels_blog.html
     csl: 'turabian-fullnote-bibliography.csl'
 format-epub:
     epub-cover-image: '/Users/engels/Pictures/spectre_big.jpg'
@@ -91,9 +91,11 @@ Take a look at `defaults.yaml` for further information on the supported conversi
 
 - `-h` or `--help`: Outputs a brief help message.
 
+- `-c YAML_FILE` or `--config=YAML_FILE`: Specify main configuration file. The default is `~/.config/pdc/defaults.yaml`. This file must exist. If the specified file has no leading path and is not found in the working directory, `pdc` also looks for it in `~/.config/pdc/`.
+
 - `-t FORMAT` or `--to=FORMAT` or `--formats=FORMAT`: Overrides the list of formats specified in the meta block or in `defaults.yaml`. A list may be specified either by repeating the argument (e.g. `--to pdf --to html`) or by specifying a single comma-separated string (e.g `--formats=pdf,html`).
 
-- `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Sets or overrides the `include` key in the meta block. YAML files will be searched for in the `~/.config/pdc/` directory.
+- `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Sets or overrides the `include` key in the meta block. Similarly to `-c`, YAML files will be searched for in the `~/.config/pdc/` directory.
 
 - `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. Corresponds to (and overrides) the `output-dir` setting in the meta block.
 
@@ -101,7 +103,7 @@ Take a look at `defaults.yaml` for further information on the supported conversi
 
 ## Automatically preprocessing source files
 
-It is possible to tell `pdc` to run the markdown files through a preprocessor before converting them. In order to do this, you set the key `preprocess-command` in your settings, either at the top level or for a specific format. In the main, however, you would wish to turn this on globally for all output formats, since it relates to the source files. On the other hand, `preprocess-args` would often be different for different outputs, since you would commonly wish to include or exclude specific sections of your document based on the output format.
+It is possible to tell `pdc` to run the markdown files through a preprocessor before converting them. In order to do this, you set the key `preprocess-command` in your settings, either at the top level or for a specific format. Generally speaking, you would wish to turn this on globally for all output formats, since it relates to the markdown source itself. However, `preprocess-args` might often be different for different outputs, since you would commonly wish to include or exclude specific sections of your document based on the output format.
 
 The command specified in `preprocess-command` must read from standard input and write to standard output.
 
@@ -110,8 +112,8 @@ If one uses [m4](https://www.gnu.org/software/m4/manual/index.html), the preproc
 ```yaml
 preprocess-command: 'm4 -P ~/.config/pdc/macros.m4 -'
 preprocess-args: '-DFALLBACK'
-format-html5:
-    preprocess-args: '-DHTML -DHTML5'
+format-html:
+    preprocess-args: '-DHTML'
 format-latex:
     preprocess-args: '-DTEX'
 ```
@@ -121,8 +123,8 @@ The corresponding configuration for [gpp](https://logological.org/gpp) would act
 ```yaml
 preprocess-command: 'gpp -H -I~/.config/pdc/macros.gpp'
 preprocess-args: '-DFALLBACK'
-format-html5:
-    preprocess-args: '-DHTML -DHTML5'
+format-html:
+    preprocess-args: '-DHTML'
 format-latex:
     preprocess-args: '-DTEX'
 ```
@@ -141,24 +143,28 @@ The following example from a document meta block shows an instance where the lat
 
 ```yaml
 pdc:
-    formats: ['latex', 'html5']
-    format-html5:
-        template: 'website.longread.html5'
+    formats: ['latex', 'html']
+    format-html:
+        template: 'website.longread.html'
         postprocess: ['send_to_site.py --target-dir=essays/']
     format-latex:
         include-before-body: titlepage.tex
         toc: true
         template: 'fancy.latex'
         postprocess:
-            'perl fixups.pl'
-            'latexmk -cd -silent -xelatex'
-            'latexmk -cd -silent -c'
-            'send_to_web.py --look-for=pdf --dest=files/pdfs/essays/'
+            - 'perl fixups.pl'
+            - 'latexmk -cd -silent -xelatex'
+            - 'latexmk -cd -silent -c'
+            - 'send_to_web.py --look-for=pdf --dest=files/pdfs/essays/'
 ```
 
 ### `generate-pdf`
 
-Converting the output to PDF is in fact an especially common kind of post-processing. Normally one can simply add 'pdf' to `formats`, but (as we saw above) this is not always the optimal solution. Also, one may want to generate two or more pdf files at once, for instance when producing both slides and an article from the same source file. For such cases, the `generate-pdf` configuration option is provided, often obviating the need for using `postprocess`. It is valid for the output formats `latex`, `beamer`, `context`, `html`, and `html5` (Note that PDF support for the latter two requires [wkhtmltopdf](http://wkhtmltopdf.org/) to be installed). Here is a somewhat typical usage example:
+Converting the output to PDF is in fact an especially common kind of post-processing. Normally one can simply add 'pdf' to `formats`, but (as we saw above) this may not always the optimal solution, especially if more than one pdf document is desired. For such cases, the `generate-pdf` configuration option may be convenient, often obviating the need for using `postprocess`. It is valid for the output formats `latex`, `beamer`, `context`, `html`, `html5`, and `ms`. The latex/context formats require `latexmk` to be installed, while the HTML formats require [wkhtmltopdf](http://wkhtmltopdf.org/) to be installed, and `ms` requires `pdfroff`.
+
+Note that the `wkhtmltopdf` conversion is currently quite basic. For instance, it does not respect custom margin settings and yields suboptimal results for embedded math. Setting `pdf-engine` to `wkhtmltopdf` and specifying `pdf` as an output format will often be preferable.
+
+An example of `generate-pdf` usage:
 
 ```yaml
 pdc:
@@ -167,12 +173,14 @@ pdc:
     m4-config: "m4_changequote(`<<', `>>')"
     format-beamer:
         preprocess-args: "-DSLIDES"
-        pdf-exension: beamer.pdf
+        pdf-extension: slides.pdf
         generate-pdf: true
     format-latex:
         preprocess-args: "-DARTICLE"
         generate-pdf: true
 ```
+
+The purpose of the `pdf-extension` setting is to ensure that one PDF document is not overwritten by another. (The default value of this setting is of course simply `pdf`).
 
 Note the `m4-config` option here; it is merely a small trick for changing the quote settings for `m4` in a nonobtrusive way and as early in the document as possible. It does not affect `pdc` itself.
 
@@ -201,9 +209,7 @@ Note that there is some overlap between command line arguments and variables in 
 
 ## Compatibility
 
-`pdc` was originally written for Pandoc version 1.17 and may not work with earlier versions.
-
-It is compatible with Pandoc version 2.x (2.1.1 at the time of writing) but (as yet) does not fully support options added or changed since the 1.x series.
+`pdc` is primarily intended for use with Pandoc version 2.x (2.18 at the time of writing). It was, however, originally written for Pandoc 1.17 and will continue to work with the 1.x series as long as one avoids putting a few incompatible options in `defaults.yaml`.
 
 ## Copyright and license
 
