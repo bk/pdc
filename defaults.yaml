@@ -9,7 +9,7 @@ source-format: 'markdown'
 # may be configured using the pdf-engine setting). Overridable
 # using the --formats (or --to, or -t) command line switch.
 #
-formats: ['html', 'pdf', 'docx']
+formats: ['html', 'pdf', 'latex']
 
 # Directory in which to place output files; can be overridden using the
 # --output-dir (or -d) switch. If the value is 'auto' (the default), creates a
