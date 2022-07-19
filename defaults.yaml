@@ -122,7 +122,7 @@ format-html:
     # 'extension' is overridden in format-html and format-epub,
     # which inherit these settings
     extension: 'html'
-    self-contained: false
+    self-contained: true
     html-q-tags: false
     ascii: false
     number-offset: ''
@@ -188,17 +188,38 @@ format-latex:
     # is produced in a separate step using latexmk, which needs to be in $PATH.
     biblatex: false
     natbib: false
+    # Referenced images will by default be copied to the pdc-extracted-media
+    # subdirectory of the *.pdc output directory.
+    extract-media: true
     # Note that standard pandoc variables for LaTeX in the document metablock
     # (also outside the pdc section) will override these options. Only define
     # the keys you need to be *default* here.
-    # Documented at http://pandoc.org/MANUAL.html#variables-set-by-pandoc
+    # Documentation: https://pandoc.org/MANUAL.html#variables - and more
+    # specifically - https://pandoc.org/MANUAL.html#variables-for-latex
     variables:
         papersize: a4
         fontsize: 12pt
         documentclass: article
         geometry: 'margin=3cm'
-        linestretch: 1.25
+        linestretch: 1.15
         biblio-style: 'authoryear'
+
+format-context:
+    # We prefer .mkiv to .tex so as not to conflict with LaTeX
+    extension: 'mkiv'
+    generate-pdf: false
+    pdf-extension: 'mkiv.pdf'
+    extract-media: true
+    # See https://pandoc.org/MANUAL.html#variables-for-context
+    variables:
+        papersize: A4
+        fontsize: 12pt
+        indenting: false
+        interlinespace: 3ex
+        margin-left: 3cm
+        margin-right: 3cm
+        margin-top: 3cm
+        margin-bottom: 3cm
 
 format-pdf:
     inherit: 'latex'
@@ -220,15 +241,24 @@ format-beamer:
     biblatex: false
     natbib: false
 
+format-ms:
+    generate-pdf: false
+    pdf-extension: 'ms.pdf'
+    variables:
+        fontfamily: P
+        indent: 2m
+        lineheight: 12p
+        pointsize: 10p
+
 ### UNCONFIGURED FORMATS
 ###
 ### The following output formats do not currently have their own format-*
 ### section:
 ###
-### asciidoc asciidoctor biblatex bibtex commonmark commonmark_x context
+### asciidoc asciidoctor biblatex bibtex commonmark commonmark_x
 ### csljson docbook docbook4 docbook5 dokuwiki dzslides epub2 fb2 gfm
 ### haddock icml jats jats_archiving jats_articleauthoring jats_publishing
 ### jira json man markdown markdown_github markdown_mmd markdown_phpextra
-### markdown_strict markua mediawiki ms muse native opendocument opml org
+### markdown_strict markua mediawiki muse native opendocument opml org
 ### plain pptx revealjs rst rtf s5 slideous slidy tei texinfo textile xwiki
 ### zimwiki
