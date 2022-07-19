@@ -4,9 +4,12 @@
 use strict;
 use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
+use File::Path qw/rmtree/;
+use File::Copy qw/copy/;
+use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.3';
+my $VERSION = '0.4';
 
 #### PRELIMINARIES
 
@@ -283,6 +286,9 @@ sub get_basic_pandoc_args {
         if ($param_name eq 'css' && $c->val('self-contained')) {
             $val = expand_css_path($val, $mddir);
         }
+        elsif ($param_name eq 'extract-media' && $val =~ /^(true|1|on|yes|auto)$/i) {
+            $val = "./pdc-extracted-media";
+        }
         $val = [$val] unless ref $val eq 'ARRAY';
         foreach my $v (@$val) {
             push @$core_cmd, "--$param_name=$v";
@@ -417,6 +423,18 @@ sub get_postprocessing {
             system("$cmd $fnarg") == 0 or warn "WARNING: postprocessing command failed: $!\n";
         };
     }
+    # Special processing if --extract-media has been used
+    if (-d "./pdc-extracted-media" && $output_dir =~ /\.pdc/) {
+        if (-d "$output_dir/pdc-extracted-media") {
+            rmtree("$output_dir/pdc-extracted-media.old") if -d "$output_dir/pdc-extracted-media.old";
+            rename("$output_dir/pdc-extracted-media", "$output_dir/pdc-extracted-media.old");
+        }
+        if (rename("./pdc-extracted-media", "$output_dir/pdc-extracted-media")) {
+            rmtree("$output_dir/pdc-extracted-media.old") if -d "$output_dir/pdc-extracted-media.old";
+        } else {
+            warn "Could not move pdc-extracted-media to $output_dir\n";
+        }
+    }
 }
 
 sub get_generate_pdf {
@@ -426,7 +444,7 @@ sub get_generate_pdf {
     if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?|ms)$/ && $ext !~ /pdf/) {
         my $pdf_output_file = $output_file;
         $pdf_output_file =~ s/$ext$/$pdfext/;
-        my (@cmd, @cleanup);
+        my (@cmd, @cleanup, $action);
         if ($fmt =~ /html/) {
             my $vars = $c->val('variables') || {};
             my @opts = ();
@@ -439,8 +457,31 @@ sub get_generate_pdf {
             @cmd = ('wkhtmltopdf', @opts, $output_file, $pdf_output_file);
         }
         elsif ($fmt eq 'context') {
-            push @cmd, qw/context --batchmode --purge --result/;
-            push @cmd, $pdf_output_file, $output_file;
+            # 'context' can only create the pdf in the current working directory.
+            # Also, it gets confused by multiple dots in filenames, hence
+            # we process the .mkiv file under a temporary name.
+            my ($path, $bare_pof) = ($pdf_output_file =~ m{(.*)/(.*)});
+            my $bare_of = $output_file;
+            $bare_of =~ s{.*[/]}{};
+            my $cwd = getcwd();
+            $action = sub {
+                chdir $path or die "Could not chdir to $path";
+                my $tmpname = "pdctmp-" . time;
+                my $tmppdf = $tmpname . '.pdf';
+                my $tmpexpdir = $tmpname . '-export';
+                $tmpname .= '.mkiv';
+                copy($bare_of, $tmpname);
+                my @ctx_cmd = qw/context --batchmode --noconsole --silent=mtx* --purgeall/;
+                push @ctx_cmd, $tmpname;
+                print "[CMD context (in destdir)]: ", join(' ', @ctx_cmd), "\n";
+                system @ctx_cmd;
+                if (-f $tmppdf) {
+                    rename($tmppdf, $bare_pof);
+                    unlink $tmpname if -f $tmpname;
+                    rmtree($tmpexpdir) if -d $tmpexpdir;
+                }
+                chdir $cwd or die "Could not chdir to $cwd";
+            };
         }
         elsif ($fmt eq 'ms') {
             push @cmd, qw/pdfroff -ms -pdfmark -mspdf -e -t -k -KUTF-8/;
@@ -456,7 +497,8 @@ sub get_generate_pdf {
             push @cmd, $output_file;
             @cleanup = (qw/latexmk -cd -c/, $output_file);
         }
-        push @$post_cmd, \@cmd;
+        push @$post_cmd, \@cmd if @cmd;
+        push @$post_cmd, $action if ref $action eq 'CODE';
         push @$post_cmd, \@cleanup if @cleanup;
     }
     elsif ($generate_pdf && $ext !~ /pdf/) {
