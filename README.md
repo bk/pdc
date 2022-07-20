@@ -4,7 +4,7 @@ The `pdc` wrapper around [pandoc](https://github.com/jgm/pandoc) makes it possib
 
 ## Installation
 
-- Place `pdc.pl` in your `$PATH` and make sure it is executable. Optionally, rename it to `pdc`.
+- Place `pdc.pl` in your `$PATH` and make sure it is executable. Alternatively, create a symlink to it under your preferred name (e.g. `pdc`).
 - Create the directory `~/.config/pdc/` and copy `defaults.yaml` there.
 - Edit your copy of `defaults.yaml` to suit your needs.
 
@@ -26,11 +26,11 @@ The following options can be specified before the list of files to be processed,
 
 ## Requirements
 
-Obviously, perl, pandoc and pandoc-citeproc need to be installed and in your `$PATH`. The normal requirements for pandoc itself also apply.
+Obviously, both perl and pandoc need to be installed and in your `$PATH`. The normal requirements for pandoc's software environment also apply. For instance, some options require LaTeX to be installed.
 
-The script requires the YAML perl module to be installed. It assumes a Unix-like environment, e.g. Linux or OS X, and will probably not work well on Windows without modification.
+The script requires the `YAML` Perl module to be installed. It assumes a Unix-like environment, such as Linux or OS X, and will not work well on Windows without modification.
 
-Some configuration options, notably turning on `--biblatex` or `--natbib` when producing PDF, require `latexmk` to be installed and in your `$PATH`.
+Some configuration options require the presence of specific programs in your `$PATH`. These mainly relate to PDF production and will be described further below (in the section Generating PDF).
 
 ## Usage
 
@@ -174,11 +174,17 @@ pdc:
             - 'send_to_web.py --look-for=pdf --dest=files/pdfs/essays/'
 ```
 
-### `generate-pdf`
+### Generating PDF
 
-Converting the output to PDF is in fact an especially common kind of post-processing. Normally one can simply add 'pdf' to `formats`, but (as we saw above) this may not always the optimal solution, especially if more than one pdf document is desired. For such cases, the `generate-pdf` configuration option may be convenient, often obviating the need for using `postprocess`. It is valid for the output formats `latex`, `beamer`, `context`, `html`, `html5`, and `ms`. The latex/beamer formats require `latexmk` to be installed, while the HTML formats require [wkhtmltopdf](http://wkhtmltopdf.org/), and `ms` requires `pdfroff`.
+There are three ways of generating PDF files using pdc:
 
-Note that the `wkhtmltopdf` conversion is currently quite basic. For instance, it does not respect custom margin settings and yields suboptimal results for embedded math. Setting `pdf-engine` to `wkhtmltopdf` and specifying `pdf` as an output format will normally be preferable to using the `generate-pdf` option.
+1. Adding `pdf` to `formats` with optional tweaks under `format-pdf`. This normally uses Pandoc's native PDF production methods, which differ somewhat between versions. The main configuration options here are `pdf-engine` and `pdf-engine-opt`. For further information on these, see the documentation for your Pandoc version. The `pdf-engine` configured in the default `defaults.yaml` file is `xelatex`. The only wrinkle here is that if `biblatex` or `natbib` are set to a true value and you use a LaTeX-based `pdf-engine` (i.e. one of `pdflatex`, `lualatex`, `xelatex`, `tectonic` or `latexmk`), then `latexmk` is run by `pdc` rather than Pandoc and needs to be in your `$PATH`.
+
+2. Setting `generate-pdf` to a true value for one or more of the following formats: `latex`, `beamer`, `context`, `html`, `html5`, `html4`, `ms`, `odt`, `docx`, or `rtf`. The `latex` and `beamer` formats require `latexmk` to be in `$PATH` for the conversion to work; `context` requires `context`; the `html` formats require `wkhtmltopdf`; `ms` requires `pdfroff`; and `odt`, `docx` and `rtf` require `libreoffice`. If you produce more than one PDF file for the same input file, unique filenames may be guaranteed by setting `pdf-extension`.
+
+3. Take care of the PDF generation manually in the `postprocess` section, as in the example above. This is obviously the most flexible option, but also involves the most work.
+
+Note that `pdc`'s `wkhtmltopdf` conversion for the HTML formats is currently rather basic. In particular, it does not respect custom margin settings and may yield suboptimal results for embedded math. Setting `pdf-engine` to `wkhtmltopdf` and specifying `pdf` as an output format will often be preferable to using the `generate-pdf` option in this case.
 
 An example of `generate-pdf` usage, where both slides and an article are generated from the same Markdown document, with some assistance from the `m4` preprocessor:
 
@@ -200,7 +206,7 @@ The purpose of the `pdf-extension` setting is to ensure that one PDF document is
 
 Note the `m4-config` option here; it is merely a small trick for changing the quote settings for `m4` in a nonobtrusive way and as early in the document as possible. It does not affect `pdc` itself, nor has it any special meaning to Pandoc.
 
-If both `postprocess` and `generate-pdf` are present, all the steps specified in `postprocess` are called before pdf generation is attended to. One needs to be aware of this, because it means that if one wishes to do something special both *before* and *after* a PDF file is created one should turn `generate-pdf` off and instead do everything in `postprocess`. (Such was the case in the illustrative example for `postprocess` above).
+If both `postprocess` and `generate-pdf` are present, all the steps specified in `postprocess` are called before `generate-pdf`-triggered PDF production is attended to. One needs to be aware of this, because it means that if one wishes to do something special both *before* and *after* a PDF file is created one should turn `generate-pdf` off and instead do everything in `postprocess`. (Such was the case in the illustrative example for `postprocess` above).
 
 
 ## Pandoc variables

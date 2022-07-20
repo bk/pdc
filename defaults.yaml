@@ -166,10 +166,14 @@ format-ipynb:
 format-odt:
     reference-doc: ''
     # Obsolete: reference-odt
+    generate-pdf: false
+    pdf-extension: 'odt.pdf'
 
 format-docx:
     reference-doc: ''
     # Obsolete: reference-docx
+    generate-pdf: false
+    pdf-extension: 'docx.pdf'
 
 format-latex:
     # Note that 'format-latex' applies to normal PDF generation
@@ -250,6 +254,10 @@ format-ms:
         lineheight: 12p
         pointsize: 10p
 
+format-rtf:
+    generate-pdf: false
+    pdf-extension: 'rtf.pdf'
+
 ### UNCONFIGURED FORMATS
 ###
 ### The following output formats do not currently have their own format-*
@@ -260,5 +268,5 @@ format-ms:
 ### haddock icml jats jats_archiving jats_articleauthoring jats_publishing
 ### jira json man markdown markdown_github markdown_mmd markdown_phpextra
 ### markdown_strict markua mediawiki muse native opendocument opml org
-### plain pptx revealjs rst rtf s5 slideous slidy tei texinfo textile xwiki
+### plain pptx revealjs rst s5 slideous slidy tei texinfo textile xwiki
 ### zimwiki

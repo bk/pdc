@@ -5,11 +5,11 @@ use strict;
 use YAML qw/LoadFile Load/;
 use File::Basename qw/fileparse/;
 use File::Path qw/rmtree/;
-use File::Copy qw/copy/;
+use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.4';
+my $VERSION = '0.5';
 
 #### PRELIMINARIES
 
@@ -441,7 +441,7 @@ sub get_generate_pdf {
     # generate-pdf config option
     my ($c, $post_cmd, $fmt, $output_file, $ext, $pdfext) = @_;
     my $generate_pdf = $c->val('generate-pdf');
-    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?|ms)$/ && $ext !~ /pdf/) {
+    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?|ms|odt|docx|rtf)$/ && $ext !~ /pdf/) {
         my $pdf_output_file = $output_file;
         $pdf_output_file =~ s/$ext$/$pdfext/;
         my (@cmd, @cleanup, $action);
@@ -484,9 +484,33 @@ sub get_generate_pdf {
             };
         }
         elsif ($fmt eq 'ms') {
-            push @cmd, qw/pdfroff -ms -pdfmark -mspdf -e -t -k -KUTF-8/;
+            # NOTE: The -U (unsafe) option is necessary if a filter has been run for
+            # `ms` image support (e.g. using the .PDFPIC macro along with ImageMagick).
+            push @cmd, qw/pdfroff -ms -pdfmark -mspdf -e -t -U -k -KUTF-8/;
             push @cmd, "--pdf-output=$pdf_output_file";
             push @cmd, $output_file;
+        }
+        elsif ($fmt =~ /docx|odt|rtf/) {
+            $action = sub {
+                my $tmpdir = "/tmp/pdc_conv_$fmt-" . time;
+                mkdir $tmpdir;
+                my @conv = qw[libreoffice --headless --convert-to pdf
+                              -env:UserInstallation=file:///tmp/LibreOffice_Conversion_pdc
+                              --outdir];
+                push @conv, $tmpdir, $output_file;
+                print("[CMD $fmt (to pdf)]: ", join(' ', @conv), "\n");
+                system @conv;
+                my $converted = $output_file;
+                $converted =~ s{.*/}{};
+                $converted =~ s{\.[^\.]+$}{.pdf};
+                $converted = "$tmpdir/$converted";
+                if (-f $converted) {
+                    move $converted, $pdf_output_file;
+                    rmtree($tmpdir);
+                } else {
+                    warn "WARNING: $converted not found -- check $tmpdir\n";
+                }
+            };
         }
         else {
             push @cmd, qw/latexmk -cd -silent/;
