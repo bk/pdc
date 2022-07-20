@@ -8,6 +8,22 @@ The `pdc` wrapper around [pandoc](https://github.com/jgm/pandoc) makes it possib
 - Create the directory `~/.config/pdc/` and copy `defaults.yaml` there.
 - Edit your copy of `defaults.yaml` to suit your needs.
 
+## Command line options
+
+The following options can be specified before the list of files to be processed, i.e. `pdc [OPTIONS] FILES`.
+
+- `-c YAML_FILE` or `--config=YAML_FILE`: Specify main config file. The default is `~/.config/pdc/defaults.yaml`. This file must exist. A file name without a leading directory path will be looked for first in the working directory and then in `~/.config/pdc/`.
+
+- `-t FORMAT` or `--to=FORMAT` or `--formats=FORMAT`: Output format override. May be repeated, e.g. `--to pdf --to html`, or specified as a single comma-separated string, e.g `-t pdf,html`.
+
+- `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Read extra config file and merge with settings in document. Corresponds to `include` key in `pdc` section of document meta. Will be looked for in `~/.config/pdc/` unless found via the working directory.
+
+- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. If set to the special value `auto` (the default), the output directory will have the same name as the (first) input file, except that the extension is replaced with `.pdc`. The default output directory for files generated from `myfile.md` is thus `myfile.pdc`. If set to a false value or the empty string, the output directory will be the current working directory.
+
+- `-n TARGETNAME` or `--target-name=TARGETNAME`: Name (without directory or extension) of output files. The default is the same basename as the first input file.
+
+- `-h` or `--help`: Shows a summary of the options.
+
 ## Requirements
 
 Obviously, perl, pandoc and pandoc-citeproc need to be installed and in your `$PATH`. The normal requirements for pandoc itself also apply.
@@ -160,11 +176,11 @@ pdc:
 
 ### `generate-pdf`
 
-Converting the output to PDF is in fact an especially common kind of post-processing. Normally one can simply add 'pdf' to `formats`, but (as we saw above) this may not always the optimal solution, especially if more than one pdf document is desired. For such cases, the `generate-pdf` configuration option may be convenient, often obviating the need for using `postprocess`. It is valid for the output formats `latex`, `beamer`, `context`, `html`, `html5`, and `ms`. The latex/context formats require `latexmk` to be installed, while the HTML formats require [wkhtmltopdf](http://wkhtmltopdf.org/) to be installed, and `ms` requires `pdfroff`.
+Converting the output to PDF is in fact an especially common kind of post-processing. Normally one can simply add 'pdf' to `formats`, but (as we saw above) this may not always the optimal solution, especially if more than one pdf document is desired. For such cases, the `generate-pdf` configuration option may be convenient, often obviating the need for using `postprocess`. It is valid for the output formats `latex`, `beamer`, `context`, `html`, `html5`, and `ms`. The latex/beamer formats require `latexmk` to be installed, while the HTML formats require [wkhtmltopdf](http://wkhtmltopdf.org/), and `ms` requires `pdfroff`.
 
-Note that the `wkhtmltopdf` conversion is currently quite basic. For instance, it does not respect custom margin settings and yields suboptimal results for embedded math. Setting `pdf-engine` to `wkhtmltopdf` and specifying `pdf` as an output format will often be preferable.
+Note that the `wkhtmltopdf` conversion is currently quite basic. For instance, it does not respect custom margin settings and yields suboptimal results for embedded math. Setting `pdf-engine` to `wkhtmltopdf` and specifying `pdf` as an output format will normally be preferable to using the `generate-pdf` option.
 
-An example of `generate-pdf` usage:
+An example of `generate-pdf` usage, where both slides and an article are generated from the same Markdown document, with some assistance from the `m4` preprocessor:
 
 ```yaml
 pdc:
@@ -182,7 +198,7 @@ pdc:
 
 The purpose of the `pdf-extension` setting is to ensure that one PDF document is not overwritten by another. (The default value of this setting is of course simply `pdf`).
 
-Note the `m4-config` option here; it is merely a small trick for changing the quote settings for `m4` in a nonobtrusive way and as early in the document as possible. It does not affect `pdc` itself.
+Note the `m4-config` option here; it is merely a small trick for changing the quote settings for `m4` in a nonobtrusive way and as early in the document as possible. It does not affect `pdc` itself, nor has it any special meaning to Pandoc.
 
 If both `postprocess` and `generate-pdf` are present, all the steps specified in `postprocess` are called before pdf generation is attended to. One needs to be aware of this, because it means that if one wishes to do something special both *before* and *after* a PDF file is created one should turn `generate-pdf` off and instead do everything in `postprocess`. (Such was the case in the illustrative example for `postprocess` above).
 
