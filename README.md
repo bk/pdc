@@ -18,9 +18,9 @@ The following options can be specified before the list of files to be processed,
 
 - `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Read extra config file and merge with settings in document. Corresponds to `include` key in `pdc` section of document meta. Will be looked for in `~/.config/pdc/` unless found via the working directory.
 
-- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. If set to the special value `auto` (the default), the output directory will have the same name as the (first) input file, except that the extension is replaced with `.pdc`. The default output directory for files generated from `myfile.md` is thus `myfile.pdc`. If set to a false value or the empty string, the output directory will be the current working directory.
+- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. If set to the special value `auto` (the default), the output directory will have the same name as the (first) input file (or as the filename specified with the `-n` switch), except that the extension is replaced with `.pdc`. The default output directory for files generated from `myfile.md` is thus `myfile.pdc`. If set to a false value or the empty string, the output directory will be the current working directory.
 
-- `-n TARGETNAME` or `--target-name=TARGETNAME`: Name (without directory or extension) of output files. The default is the same basename as the first input file.
+- `-n TARGETNAME` or `--target-name=TARGETNAME`: Name (without directory or extension) of output files. The default is the same basename as the first input file. This is mostly useful when there are multiple source files, e.g. `pdc -n book ch1.md ch2.md ch3.md`. Note that if `output-dir` is `auto`, this also affects the name of the output directory; in the above example, the export files would therefore be placed in the directory `book.pdc`.
 
 - `-h` or `--help`: Shows a summary of the options.
 
@@ -59,7 +59,7 @@ pdc:
 ...
 ```
 
-Note that `format-latex` affects the PDF format, since the latter is simply a LaTeX document compiled to PDF.
+Note that `format-latex` affects the PDF format, since the latter (in this case) is simply a LaTeX document compiled to PDF. (There are other options for PDF generation, for which see below.)
 
 Now, let's suppose that Karl and Friedrich collaborate on this document through a shared Github repository, but it is tedious for Friedrich to be constantly changing the `pdc` section of the file in his working directory to point to the correct cover image. Also, he would like to add a version of the manifesto to his blog (where he uses a different citation style) and is not really interested in the PDF or Word formats.
 
@@ -103,21 +103,8 @@ format-epub:
 
 Take a look at `defaults.yaml` for further information on the supported conversion settings. Most settings map directly on to `pandoc` command line options, while the rest is explained using comments.
 
-## Command line arguments
 
-- `-h` or `--help`: Outputs a brief help message.
-
-- `-c YAML_FILE` or `--config=YAML_FILE`: Specify main configuration file. The default is `~/.config/pdc/defaults.yaml`. This file must exist. If the specified file has no leading path and is not found in the working directory, `pdc` also looks for it in `~/.config/pdc/`.
-
-- `-t FORMAT` or `--to=FORMAT` or `--formats=FORMAT`: Overrides the list of formats specified in the meta block or in `defaults.yaml`. A list may be specified either by repeating the argument (e.g. `--to pdf --to html`) or by specifying a single comma-separated string (e.g `--formats=pdf,html`).
-
-- `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Sets or overrides the `include` key in the meta block. Similarly to `-c`, YAML files will be searched for in the `~/.config/pdc/` directory.
-
-- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. Corresponds to (and overrides) the `output-dir` setting in the meta block.
-
--  `-n TARGETNAME` or `--target-name=TARGETNAME`: Overrides the basename of the target file(s), which by default is the same as the name of the first source file specified. This is mostly useful when there are multiple source files, e.g. `pdc -n book ch1.md ch2.md ch3.md`. Note that if `output-dir` is `auto`, this also affects the name of the output directory; in the above example, the export files would therefore be placed in the directory `book.pdc`.
-
-## Automatically preprocessing source files
+## Preprocessing source files
 
 It is possible to tell `pdc` to run the markdown files through a preprocessor before converting them. In order to do this, you set the key `preprocess-command` in your settings, either at the top level or for a specific format. Generally speaking, you would wish to turn this on globally for all output formats, since it relates to the markdown source itself. However, `preprocess-args` might often be different for different outputs, since you would commonly wish to include or exclude specific sections of your document based on the output format.
 
@@ -174,7 +161,7 @@ pdc:
             - 'send_to_web.py --look-for=pdf --dest=files/pdfs/essays/'
 ```
 
-### Generating PDF
+## Generating PDF
 
 There are three ways of generating PDF files using pdc:
 
