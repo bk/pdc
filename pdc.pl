@@ -3,13 +3,13 @@
 
 use strict;
 use YAML qw/LoadFile Load/;
-use File::Basename qw/fileparse/;
+use File::Basename qw/fileparse dirname/;
 use File::Path qw/rmtree/;
 use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.5';
+my $VERSION = '0.5.1';
 
 #### PRELIMINARIES
 
@@ -97,6 +97,9 @@ my @mdfiles = @ARGV or die "ERROR: Need at least one markdown file as parameter\
 for my $mdf (@mdfiles) {
     die "ERROR: markdown file $mdf does not exist\n" unless -f $mdf;
 }
+# Set working directory to the location of the first file to be processed.
+my $workdir = dirname($mdfiles[0]);
+chdir $workdir or die "Could not chdir to $workdir";
 
 #### CONFIG
 
