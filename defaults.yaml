@@ -246,13 +246,13 @@ format-beamer:
     natbib: false
 
 format-ms:
-    generate-pdf: false
+    # generate-pdf: false
     pdf-extension: 'ms.pdf'
-    variables:
-        fontfamily: P
-        indent: 2m
-        lineheight: 12p
-        pointsize: 10p
+    # variables:
+    #    fontfamily: P
+    #    indent: 2m
+    #    lineheight: 12p
+    #    pointsize: 10p
 
 format-rtf:
     generate-pdf: false
