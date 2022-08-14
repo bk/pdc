@@ -23,6 +23,7 @@ my %pandoc_args = (
             reference-links atx-headers listings incremental section-divs
             html-q-tags citeproc natbib biblatex mathml gladtex trace
             dump-args ignore-args verbose quiet fail-if-warnings
+            embed-resources
           / ],
 
     # These may be used as booleans but can also take an URL argument
@@ -295,6 +296,17 @@ sub get_basic_pandoc_args {
         $val = [$val] unless ref $val eq 'ARRAY';
         foreach my $v (@$val) {
             push @$core_cmd, "--$param_name=$v";
+        }
+    }
+    # A 'defaults' key in the metadata overwrites one from the config file.
+    # To prevent repetition, we can specify additional default files under
+    # 'defaults-extra', thus extending the defaults.yaml settings instead
+    # of overriding them.
+    if ($c->val('defaults-extra')) {
+        my $de = $c->val('defaults-extra');
+        $de = [$de] unless ref $de;
+        foreach my $v (@$de) {
+            push @$core_cmd, "--defaults=$v";
         }
     }
 }
