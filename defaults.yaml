@@ -122,6 +122,7 @@ format-html:
     # 'extension' is overridden in format-html and format-epub,
     # which inherit these settings
     extension: 'html'
+    # Note: for 2.19+, use standalone + embed-resources instead of self-contained
     self-contained: true
     html-q-tags: false
     ascii: false
@@ -269,4 +270,4 @@ format-rtf:
 ### jira json man markdown markdown_github markdown_mmd markdown_phpextra
 ### markdown_strict markua mediawiki muse native opendocument opml org
 ### plain pptx revealjs rst s5 slideous slidy tei texinfo textile xwiki
-### zimwiki
+### zimwiki csv tsv
