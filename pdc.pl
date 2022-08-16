@@ -9,7 +9,7 @@ use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.5.1';
+my $VERSION = '0.5.2';
 
 #### PRELIMINARIES
 
@@ -663,7 +663,8 @@ sub merge_conf {
 }
 
 sub check_options {
-    # @formats are not checked
+    # NOTE: @formats are not checked
+    $config_file .= '.yaml' unless $config_file =~ /\.\w{1,5}$/;
     if (!-f $config_file && -f "$conf_dir/$config_file") {
         $config_file = "$conf_dir/$config_file";
     }
@@ -712,6 +713,8 @@ Options:
     Specify main config file. The default is ~/.config/pdc/defaults.yaml.
     This file must exist. A file name without a leading directory path will
     be looked for first in the working directory and then in ~/.config/pdc/.
+    If the file has no extension, '.yaml' is taken as implicit. Thus,
+    '-c mysettings' normally means '-c ~/.config/pdc/mysettings.yaml'.
 
   -t FORMAT or --to=FORMAT or --formats=FORMAT
 
@@ -722,14 +725,17 @@ Options:
 
     Read extra config file and merge with settings in document.
     Corresponds to 'include' key in 'pdc' section of document meta.
+    This file is NOT looked for in ~/.config/pdc/.
 
   -d DIRNAME or --output-dir=DIRNAME
 
-    Output files to this directory.
+    Output files to this directory. This overrides the 'output-dir'
+    setting in the config file.
 
   -n TARGETNAME or --target-name=TARGETNAME
 
-    Name (without directory or extension) of output files.
+    Name (without directory or extension) of output files. The default
+    is the same as the basename of the (first) input file.
 
   -h or --help
 
