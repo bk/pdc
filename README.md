@@ -12,13 +12,13 @@ The `pdc` wrapper around [pandoc](https://github.com/jgm/pandoc) makes it possib
 
 The following options can be specified before the list of files to be processed, i.e. `pdc [OPTIONS] FILES`.
 
-- `-c YAML_FILE` or `--config=YAML_FILE`: Specify main config file. The default is `~/.config/pdc/defaults.yaml`. This file must exist. A file name without a leading directory path will be looked for first in the working directory and then in `~/.config/pdc/`.
+- `-c YAML_FILE` or `--config=YAML_FILE`: Specify main config file. The default is `~/.config/pdc/defaults.yaml`. This file must exist. A file name without a leading directory path will be looked for first in the working directory and then in `~/.config/pdc/`. If the file has no extension, `.yaml` is taken as implicit. Thus, `-c mysettings` normally means `-c ~/.config/pdc/mysettings.yaml`.
 
 - `-t FORMAT` or `--to=FORMAT` or `--formats=FORMAT`: Output format override. May be repeated, e.g. `--to pdf --to html`, or specified as a single comma-separated string, e.g `-t pdf,html`.
 
 - `-i YAML_FILE` or `--include-yaml=YAML_FILE`: Read extra config file and merge with settings in document. Corresponds to `include` key in `pdc` section of document meta. Will be looked for in `~/.config/pdc/` unless found via the working directory.
 
-- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory. If set to the special value `auto` (the default), the output directory will have the same name as the (first) input file (or as the filename specified with the `-n` switch), except that the extension is replaced with `.pdc`. The default output directory for files generated from `myfile.md` is thus `myfile.pdc`. If set to a false value or the empty string, the output directory will be the current working directory.
+- `-d DIRNAME` or `--output-dir=DIRNAME`: Output files to this directory; overrides the `output-dir` setting from the configuration file. If set to the special value `auto` (the default), the output directory will have the same name as the (first) input file (or as the filename specified with the `-n` switch), except that the extension is replaced with `.pdc`. The default output directory for files generated from `myfile.md` is thus `myfile.pdc/`. If set to a false value or the empty string, the output directory will be the current working directory.
 
 - `-n TARGETNAME` or `--target-name=TARGETNAME`: Name (without directory or extension) of output files. The default is the same basename as the first input file. This is mostly useful when there are multiple source files, e.g. `pdc -n book ch1.md ch2.md ch3.md`. Note that if `output-dir` is `auto`, this also affects the name of the output directory; in the above example, the export files would therefore be placed in the directory `book.pdc`.
 
@@ -142,7 +142,7 @@ In many cases, preprocessing represents an efficient and highly configurable alt
 
 Sometimes you need to do something with an output file after `pandoc` is done with it, e.g. run it through a fix-up filter of some kind or placing it onto your web site. By adding a `postprocess` section to the configuration for the appropriate format, `pdc` will run these commands for you automatically each time it is invoked. It is possible to run several preprocess commands for the same output format. Each preprocess command receives the name of the output file as its only argument.
 
-The following example from a document meta block shows an instance where the latex output from pandoc had some small imperfections that needed to be smoothed out before actually generating the pdf. The pdf generation is therefore relegated to a post-processing step, rather than being explicitly listed in `formats`. In this way, one can almost always avoid having to write a makefile or shell script (or running the entire repetitive sequence of commands by hand).
+The following example from a document meta block shows an instance where the latex output from pandoc had some small imperfections that needed to be smoothed out before actually generating the pdf. The pdf generation is therefore relegated to a post-processing step, rather than being explicitly listed in `formats`. In this way, one can almost always avoid having to write a makefile or shell script (not to speak of running the entire repetitive sequence of commands by hand).
 
 ```yaml
 pdc:
@@ -215,13 +215,18 @@ Note that there is some overlap between command line arguments and variables in 
 * There are four pre-defined pandoc variables which share a name with a command-line argument: `title`, `toc`, `bibliography, csl`.
 * There are three further variables which have direct pandoc command-line equivalents although the names are not quite identical: `header-includes` (which corresponds to `--include-in-header`), `include-before` (corresponding to `--include-before-body`), and `include-after` (corresponding to `--include-after-body`).
 
+## A note on defaults files
+
+Some of the functionality of `pdc` overlaps with [Pandoc defaults files](https://pandoc.org/MANUAL.html#defaults-files), first introduced in Pandoc v2.8 (2019-11-22) and extended and improved in later versions. However, defaults files only target a single output format at a time and provide no options for pre- or postprocessing (other than standard Pandoc filters). Also, some Pandoc parameters still cannot be controlled via this route.
+
+Usage of `pdc` can with advantage be combined with a well-written set of defaults files. The majority of the settings for each output format may then, for instance, be specified in defaults files while the `pdc` config file will reference them and additionally specify the list of output formats as well as any pre- and postprocessing.
 
 ## Compatibility
 
-`pdc` is primarily intended for use with Pandoc version 2.x (2.18 at the time of writing). It was, however, originally written for Pandoc 1.17 and will continue to work with the 1.x series as long as one avoids putting a few incompatible options in `defaults.yaml`.
+`pdc` is primarily intended for use with Pandoc version 2.x (2.19 as of the current `pdc` version). It was, however, originally written for Pandoc 1.17 and will continue to work with the 1.x series as long as one avoids putting a few incompatible options in `defaults.yaml`.
 
 ## Copyright and license
 
-Copyright: Baldur A. Kristinsson, 2016 and later.
+Copyright: Baldur A. Kristinsson, 2016-2022.
 
 All source files in this package, including the documentation, are open source software under the terms of [Perl's Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)
