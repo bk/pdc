@@ -9,7 +9,7 @@ use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.5.2';
+my $VERSION = '0.6';
 
 #### PRELIMINARIES
 
@@ -122,7 +122,21 @@ if (join('::', sort @{$conf->{formats}}) =~ /latex:.*:pdf/) {
 
 foreach my $format (@{ $conf->{formats} }) {
     my @cmds = get_commands($format, $conf, @mdfiles);
+    my %env_orig = %ENV;
     foreach my $cmd (@cmds) {
+        local(%ENV) = %env_orig;
+        if (ref $conf->{"format-$format"} && $conf->{"format-$format"}->{ENV}) {
+            for my $k (keys %{ $conf->{"format-$format"}->{ENV} }) {
+                my $val = $conf->{"format-$format"}->{ENV}->{$k};
+                if ($k eq 'SOURCE_DATE_EPOCH' && $val =~ /file/i && @mdfiles) {
+                    # set source-date-epoch based on the timestamp of the first mdfile
+                    $ENV{$k} = (stat $mdfiles[0])[9] || time;
+                }
+                else {
+                    $ENV{$k} = $val;
+                }
+            }
+        }
         if (ref $cmd eq 'CODE') {
             print "[CLEANUP/PREP $format]\n";
             $cmd->();
@@ -157,6 +171,7 @@ sub get_commands {
     my @post_cmd = ();
     push @$core_cmd, "-t", $fmt;
     my $c = new Conf (format=>$fmt, conf=>$conf,
+                      is_pdf=>($format eq 'pdf' ? 1 : 0),
                       version=>$major_version, full_version=>$version);
 
     my ($ext, $pdfext, $two_stage) = get_file_extensions($c, $format);
@@ -714,7 +729,8 @@ Options:
     This file must exist. A file name without a leading directory path will
     be looked for first in the working directory and then in ~/.config/pdc/.
     If the file has no extension, '.yaml' is taken as implicit. Thus,
-    '-c mysettings' normally means '-c ~/.config/pdc/mysettings.yaml'.
+    '-c mysettings' is short for '-c ~/.config/pdc/mysettings.yaml',
+    and '-c draft/manu' for '-c ~/.config/pdc/draft/manu.yaml'.
 
   -t FORMAT or --to=FORMAT or --formats=FORMAT
 
@@ -766,6 +782,9 @@ sub val {
     my $conf = $self->{conf};
     my $fmt = $self->{format};
     my $val;
+    if ($self->{is_pdf} && defined $conf->{'format-pdf'}->{$key} && $key ne 'inherit') {
+        return $conf->{'format-pdf'}->{$key};
+    }
     my $try_key = "format-$fmt";
     while ($try_key) {
         if (exists $conf->{$try_key}->{$key}) {
