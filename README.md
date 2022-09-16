@@ -215,6 +215,20 @@ Note that there is some overlap between command line arguments and variables in 
 * There are four pre-defined pandoc variables which share a name with a command-line argument: `title`, `toc`, `bibliography, csl`.
 * There are three further variables which have direct pandoc command-line equivalents although the names are not quite identical: `header-includes` (which corresponds to `--include-in-header`), `include-before` (corresponding to `--include-before-body`), and `include-after` (corresponding to `--include-after-body`).
 
+## Environment
+
+Environment variables for each format may be set via the `ENV` key. This is useful for preprocessors and filters, as well as with regard to the handful of environment variables affecting Pandoc itself.
+
+Aside from literal values, one special case is recognized with regard to the `SOURCE_DATE_EPOCH` environment variable. If you configure that like this
+
+``` yaml
+format-docx:
+    ENV:
+        SOURCE_DATE_EPOCH: source-file
+```
+
+then `pdc` will set its value to the modification time of the first source file being converted. This is useful for reproducible builds of certain output formats (such as docx), as described in the [Pandoc documentation](https://pandoc.org/MANUAL.html#reproducible-builds).
+
 ## A note on defaults files
 
 Some of the functionality of `pdc` overlaps with [Pandoc defaults files](https://pandoc.org/MANUAL.html#defaults-files), first introduced in Pandoc v2.8 (2019-11-22) and extended and improved in later versions. However, defaults files only target a single output format at a time and provide no options for pre- or postprocessing (other than standard Pandoc filters). Also, some Pandoc parameters still cannot be controlled via this route.
