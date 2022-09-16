@@ -9,7 +9,7 @@ source-format: 'markdown'
 # may be configured using the pdf-engine setting). Overridable
 # using the --formats (or --to, or -t) command line switch.
 #
-formats: ['html', 'pdf', 'latex']
+formats: ['html', 'pdf', 'docx']
 
 # Directory in which to place output files; can be overridden using the
 # --output-dir (or -d) switch. If the value is 'auto' (the default), creates a
@@ -122,8 +122,9 @@ format-html:
     # 'extension' is overridden in format-html and format-epub,
     # which inherit these settings
     extension: 'html'
-    # Note: for 2.19+, use standalone + embed-resources instead of self-contained
-    self-contained: true
+    # This is now (v2.19+) deprecated, replaced by --embed-resources --standalone
+    #self-contained: true
+    embed-resources: true
     html-q-tags: false
     ascii: false
     number-offset: ''
@@ -149,6 +150,8 @@ format-html4:
     extension: 'htm'
 
 format-epub3:
+    ENV:
+        SOURCE_DATE_EPOCH: source-file
     inherit: 'html5'
     epub-stylesheet: ''
     epub-cover-image: ''
@@ -165,12 +168,16 @@ format-ipynb:
     ipynb-output-all: 'best'
 
 format-odt:
+    ENV:
+        SOURCE_DATE_EPOCH: source-file
     reference-doc: ''
     # Obsolete: reference-odt
     generate-pdf: false
     pdf-extension: 'odt.pdf'
 
 format-docx:
+    ENV:
+        SOURCE_DATE_EPOCH: source-file
     reference-doc: ''
     # Obsolete: reference-docx
     generate-pdf: false
@@ -227,11 +234,21 @@ format-context:
         margin-bottom: 3cm
 
 format-pdf:
-    inherit: 'latex'
-    # Valid LaTeX values (implying -t latex): pdflatex, lualatex, xelatex, latexmk, tectonic.
-    # Other valid TeX values (implying -t context): context.
-    # Valid HTML-based values (implying -t html): wkhtmltopdf, weasyprint, pagedjs-cli, prince
-    # Other: pdfroff (implying -t ms)
+    # NOTE: For format-pdf, indicate inheritance with `pdf-engine`
+    #       rather than `inherit`.
+    #
+    # - Valid LaTeX values (implying -t latex):
+    #     pdflatex, lualatex, xelatex, latexmk, tectonic.
+    # - Other valid TeX values (implying -t context):
+    #     context.
+    # - Valid HTML-based values (implying -t html):
+    #     wkhtmltopdf, weasyprint, pagedjs-cli, prince
+    # - Other:
+    #     pdfroff (implying -t ms)
+    #
+    # To generate PDF via other formats (e.g. docx, odt), use
+    # the `generate-pdf` option there rather the `formats` list
+    #
     pdf-engine: 'xelatex'
     pdf-engine-opt: []
 
