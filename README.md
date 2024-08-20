@@ -26,7 +26,7 @@ The following options can be specified before the list of files to be processed,
 
 ## Requirements
 
-Obviously, both perl and pandoc need to be installed and in your `$PATH`. The normal requirements for pandoc's software environment also apply. For instance, some options require LaTeX to be installed.
+Obviously, both perl and pandoc need to be installed and in your `$PATH`. The normal requirements for pandoc's software environment also apply. For instance, some options require external programs to be installed, such as LaTeX, groff or typst.
 
 The script requires the `YAML` Perl module to be installed. It assumes a Unix-like environment, such as Linux or OS X, and will not work well on Windows without modification.
 
@@ -80,7 +80,7 @@ pdc:
 ...
 ```
 
-Marx's version of `manifesto.yaml` (most conveniently placed into `~/.config/pdc/`) will then be:
+Karl's version of `manifesto.yaml` (most conveniently placed into `~/.config/pdc/`) will then be:
 
 ```yaml
 formats: ['pdf', 'docx', 'epub']
@@ -90,7 +90,7 @@ format-epub:
     epub-cover-image: '/home/km/img/spectre_big.jpg'
 ```
 
-as we saw above, while Engels's version of this file perhaps might look like this:
+as we saw above, while Friedrich's version of this file perhaps might look like this:
 
 ```yaml
 formats: ['html', 'epub']
@@ -167,7 +167,7 @@ There are three ways of generating PDF files using pdc:
 
 1. Adding `pdf` to `formats` with optional tweaks under `format-pdf`. This normally uses Pandoc's native PDF production methods, which differ somewhat between versions. The main configuration options here are `pdf-engine` and `pdf-engine-opt`. For further information on these, see the documentation for your Pandoc version. The `pdf-engine` configured in the default `defaults.yaml` file is `xelatex`. The only wrinkle here is that if `biblatex` or `natbib` are set to a true value and you use a LaTeX-based `pdf-engine` (i.e. one of `pdflatex`, `lualatex`, `xelatex`, `tectonic` or `latexmk`), then `latexmk` is run by `pdc` rather than Pandoc and needs to be in your `$PATH`.
 
-2. Setting `generate-pdf` to a true value for one or more of the following formats: `latex`, `beamer`, `context`, `html`, `html5`, `html4`, `ms`, `odt`, `docx`, or `rtf`. The `latex` and `beamer` formats require `latexmk` to be in `$PATH` for the conversion to work; `context` requires `context`; the `html` formats require `wkhtmltopdf`; `ms` requires `pdfroff`; and `odt`, `docx` and `rtf` require `libreoffice`. If you produce more than one PDF file for the same input file, unique filenames may be guaranteed by setting `pdf-extension`.
+2. Setting `generate-pdf` to a true value for one or more of the following formats: `latex`, `beamer`, `context`, `html`, `html5`, `html4`, `ms`, `typst`, `odt`, `docx`, or `rtf`. The `latex` and `beamer` formats require `latexmk` to be in `$PATH` for the conversion to work; `context` requires `context`; the `html` formats require `wkhtmltopdf`; `ms` requires `pdfroff`; `typst` requires a `typst` executable; and `odt`, `docx` and `rtf` require `libreoffice`. If you produce more than one PDF file for the same input file, unique filenames may be guaranteed by setting `pdf-extension`.
 
 3. Take care of the PDF generation manually in the `postprocess` section, as in the example above. This is obviously the most flexible option, but also involves the most work.
 
@@ -237,10 +237,10 @@ Usage of `pdc` can with advantage be combined with a well-written set of default
 
 ## Compatibility
 
-`pdc` is primarily intended for use with Pandoc version 2.x (2.19 as of the current `pdc` version). It was, however, originally written for Pandoc 1.17 and will continue to work with the 1.x series as long as one avoids putting a few incompatible options in `defaults.yaml`.
+`pdc` is primarily intended for use with Pandoc version 3.x (3.3 as of the current `pdc` version, v0.7). It can, however, also be used with older versions of Pandoc, even the 1.x series, if one avoids using newer options and formats in `defaults.yaml` and other configuration files.
 
 ## Copyright and license
 
-Copyright: Baldur A. Kristinsson, 2016-2022.
+Copyright: Baldur A. Kristinsson, 2016-2024.
 
 All source files in this package, including the documentation, are open source software under the terms of [Perl's Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)

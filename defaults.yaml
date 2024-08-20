@@ -1,7 +1,9 @@
 # TOP-LEVEL SETTINGS (formats, output-dir, overwrite, include, preprocess-*)
 
 # Source format. Normally 'markdown' but may be overridden if desired
-# (most commonly to turn certain Markdown extensions off/on)
+# (most commonly to turn certain Markdown extensions off/on, or so as
+# to use the more standardized commonmark/commonmark_x, which is
+# more lightweight albeit less featureful).
 source-format: 'markdown'
 
 # Which output formats to turn on; valid are all output formats supported by
@@ -124,6 +126,7 @@ format-html:
     extension: 'html'
     # This is now (v2.19+) deprecated, replaced by --embed-resources --standalone
     #self-contained: true
+    standalone: true
     embed-resources: true
     html-q-tags: false
     ascii: false
@@ -233,6 +236,15 @@ format-context:
         margin-top: 3cm
         margin-bottom: 3cm
 
+format-typst:
+    extension: 'typ'
+    generate-pdf: false
+    variables:
+        # NOTE: no support for dict values for variables on command line, so
+        # margin must be set directly in the top-level meta or in a separate file.
+        papersize: a4
+        fontsize: 12pt
+
 format-pdf:
     # NOTE: For format-pdf, indicate inheritance with `pdf-engine`
     #       rather than `inherit`.
@@ -244,12 +256,12 @@ format-pdf:
     # - Valid HTML-based values (implying -t html):
     #     wkhtmltopdf, weasyprint, pagedjs-cli, prince
     # - Other:
-    #     pdfroff (implying -t ms)
+    #     pdfroff (implying -t ms), typst (implying -t typst)
     #
     # To generate PDF via other formats (e.g. docx, odt), use
     # the `generate-pdf` option there rather the `formats` list
     #
-    pdf-engine: 'xelatex'
+    pdf-engine: 'lualatex'
     pdf-engine-opt: []
 
 format-beamer:
@@ -264,8 +276,8 @@ format-beamer:
     natbib: false
 
 format-ms:
-    # generate-pdf: false
-    pdf-extension: 'ms.pdf'
+    generate-pdf: false
+    # pdf-extension: 'ms.pdf'
     # variables:
     #    fontfamily: P
     #    indent: 2m
@@ -281,10 +293,9 @@ format-rtf:
 ### The following output formats do not currently have their own format-*
 ### section:
 ###
-### asciidoc asciidoctor biblatex bibtex commonmark commonmark_x
-### csljson docbook docbook4 docbook5 dokuwiki dzslides epub2 fb2 gfm
-### haddock icml jats jats_archiving jats_articleauthoring jats_publishing
-### jira json man markdown markdown_github markdown_mmd markdown_phpextra
-### markdown_strict markua mediawiki muse native opendocument opml org
-### plain pptx revealjs rst s5 slideous slidy tei texinfo textile xwiki
-### zimwiki csv tsv
+### asciidoc asciidoc_legacy asciidoctor biblatex bibtex commonmark commonmark_x
+### csljson djot docbook docbook4 docbook5 dokuwiki dzslides epub2 fb2 gfm
+### haddock icml jats jats_archiving jats_articleauthoring jats_publishing jira
+### json man markdown markdown_github markdown_mmd markdown_phpextra
+### markdown_strict markua mediawiki muse native opendocument opml org plain
+### pptx revealjs rst s5 slideous slidy tei texinfo textile xwiki zimwiki

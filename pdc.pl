@@ -9,7 +9,7 @@ use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.6';
+my $VERSION = '0.7';
 
 #### PRELIMINARIES
 
@@ -19,11 +19,11 @@ my %pandoc_args = (
         qw/
             file-scope sandbox standalone ascii toc table-of-contents
             number-sections no-highlight preserve-tabs self-contained
-            no-check-certificate strip-empty-paragraphs strip-comments
-            reference-links atx-headers listings incremental section-divs
-            html-q-tags citeproc natbib biblatex mathml gladtex trace
-            dump-args ignore-args verbose quiet fail-if-warnings
-            embed-resources
+            no-check-certificate strip-comments reference-links listings
+            incremental section-divs html-q-tags citeproc natbib biblatex
+            mathml gladtex trace dump-args ignore-args verbose quiet
+            fail-if-warnings embed-resources link-images
+            no-check-certificate
           / ],
 
     # These may be used as booleans but can also take an URL argument
@@ -50,26 +50,27 @@ my %pandoc_args = (
 # If present in meta (outside the pdc section), these override all 'variables'
 # settings from defaults.yaml.
 my @pandoc_variables = qw/
-    abstract abstract-title adjusting aspectratio author backgroundcolor
-    beamerarticle beameroption biblatexoptions bibliography biblio-style
-    biblio-title block-headings body category citecolor CJKmainfont
-    CJKoptions classoption colorlinks colortheme contrastcolor
-    curdir date date-meta description dir documentclass document-css
-    filecolor fontcolor fontenc fontfamily fontfamilyoptions fontsize
-    fonttheme footer footer-html footertext geometry header header-html
-    header-includes headertext hyperrefoptions hyphenate include-after
-    include-before includesource indent indenting innertheme institute
-    interlinespace keywords lang layout lineheight linestretch
-    linkcolor links-as-notes linkstyle lof logo lot mainfont
-    mainfontoptions margin-bottom margin-left margin-right margin-top
-    margin-top-margin-bottom mathfont meta-json microtypeoptions
-    monobackgroundcolor monofont monofontoptions natbiboptions
-    navigation numbersections outertheme outputfile pagenumbering
-    pagestyle papersize pdfa pdfaiccprofile pdfaintent pointsize
-    revealjs-url s5-url sansfont sansfontoptions secnumdepth section
-    section-titles slideous-url slidy-url sourcefile subject subtitle
-    thanks theme themeoptions title titlegraphic title-slide-attributes
-    toc toccolor toc-depth toc-title urlcolor
+    abstract abstract-title adjusting aspectratio author babelfonts
+    backgroundcolor beamerarticle beameroption biblatexoptions
+    bibliography biblio-style biblio-title block-headings body category
+    citecolor CJKmainfont CJKmonofont CJKoptions CJKsansfont classoption
+    colorlinks colortheme columns contrastcolor curdir date date-meta
+    description dir documentclass document-css filecolor fontcolor fontenc
+    fontfamily fontfamilyoptions fontsize fonttheme footer footer-html
+    footertext geometry handout header header-html header-includes headertext
+    hyperrefoptions include-after include-before includesource indent indenting
+    innertheme institute interlinespace keywords lang layout lineheight
+    linestretch linkcolor links-as-notes linkstyle lof logo lot mainfont
+    mainfontfallback mainfontoptions margin-bottom margin-left margin-right
+    margin-top mathfont mathfontoptions meta-json microtypeoptions
+    monobackgroundcolor monofont monofontfallback monofontoptions natbiboptions
+    navigation numbersections outertheme outputfile pagenumbering pagestyle
+    papersize pdfa pdfaiccprofile pdfaintent pointsize revealjs-url s5-url
+    sansfont sansfontfallback sansfontoptions secnumdepth section
+    section-numbering section-titles slideous-url slidy-url sourcefile subject
+    subtitle thanks theme themeoptions title titlegraphic titlegraphicoptions
+    title-slide-attributes toc toccolor toc-depth toc-title urlcolor urstyle
+    version whitespace
 /;
 # keeps track of variables specified in the meta block (see above)
 my %vars_in_meta = ();
@@ -227,6 +228,7 @@ sub target_pdf_format {
         'pagedjs-cli' => 'html',
         'prince' => 'html',
         'pdfroff' => 'ms',
+        'typst' => 'typst',
         );
     my $eng = $conf->{'format-pdf'} ? $conf->{'format-pdf'}->{'pdf-engine'} : $conf->{'pdf-engine'};
     $eng ||= 'xelatex';
@@ -369,8 +371,13 @@ sub get_filters_etc {
         }
         my $val = $variables->{$vk};
         $val = undef if $val eq 'false';
-        my $vval = defined $val && length($val) ? "$vk:$val" : undef;
-        push @$core_cmd, "--variable=$vval" if $vval;
+        if (ref $val) {
+            warn "WARNING: SKIPPING variable '$vk' for format $c->{format}: no support for structured values here\n";
+        }
+        else {
+            my $vval = defined $val && length($val) ? "$vk:$val" : undef;
+            push @$core_cmd, "--variable=$vval" if $vval;
+        }
     }
 }
 
@@ -471,7 +478,7 @@ sub get_generate_pdf {
     # generate-pdf config option
     my ($c, $post_cmd, $fmt, $output_file, $ext, $pdfext) = @_;
     my $generate_pdf = $c->val('generate-pdf');
-    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?|ms|odt|docx|rtf)$/ && $ext !~ /pdf/) {
+    if ($generate_pdf && $fmt =~ /^(?:latex|beamer|context|html5?|ms|typst|odt|docx|rtf)$/ && $ext !~ /pdf/) {
         my $pdf_output_file = $output_file;
         $pdf_output_file =~ s/$ext$/$pdfext/;
         my (@cmd, @cleanup, $action);
@@ -520,6 +527,9 @@ sub get_generate_pdf {
             push @cmd, "--pdf-output=$pdf_output_file";
             push @cmd, $output_file;
         }
+        elsif ($fmt eq 'typst') {
+            push @cmd, ('typst', 'compile', $output_file, $pdf_output_file);
+        }
         elsif ($fmt =~ /docx|odt|rtf/) {
             $action = sub {
                 my $tmpdir = "/tmp/pdc_conv_$fmt-" . time;
@@ -564,7 +574,12 @@ sub load_config {
     my $conf_file = shift;
     $conf_file = "$conf_dir/$conf_file" unless -f $conf_file;
     return {} unless -f $conf_file;
-    return LoadFile($conf_file);
+    my $conf = LoadFile($conf_file) || {};
+    if ($conf->{include}) {
+        my $inc = load_config($conf->{include});
+        merge_conf($inc, $conf);
+    }
+    return $conf;
 }
 
 sub get_meta {
