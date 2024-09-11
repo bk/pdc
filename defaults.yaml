@@ -111,6 +111,9 @@ citeproc: false
 csl: ''
 bibliography: ''
 citation-abbreviations: ''
+# caption position
+table-caption-position: above
+figure-caption-position: below
 
 #
 # FORMAT-* SECTIONS

@@ -9,7 +9,7 @@ use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.7';
+my $VERSION = '0.7.1';
 
 #### PRELIMINARIES
 
@@ -44,6 +44,7 @@ my %pandoc_args = (
             email-obfuscation id-prefix title-prefix css epub-subdirectory
             epub-cover-image epub-metadata epub-embed-font epub-chapter-level
             ipynb-output bibliography csl citation-abbreviations log
+            figure-caption-position table-caption-position
           / ],
 );
 
