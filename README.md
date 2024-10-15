@@ -237,7 +237,7 @@ Usage of `pdc` can with advantage be combined with a well-written set of default
 
 ## Compatibility
 
-`pdc` is primarily intended for use with Pandoc version 3.x (3.4 as of the current `pdc` version, v0.7.1). It can, however, also be used with older versions of Pandoc, even the 1.x series, if one avoids using newer options and formats in `defaults.yaml` and other configuration files.
+`pdc` is primarily intended for use with Pandoc version 3.x (3.5 as of the current `pdc` version, v0.7.2). It can, however, also be used with older versions of Pandoc, even the 1.x series, if one avoids using newer options and formats in `defaults.yaml` and other configuration files.
 
 ## Copyright and license
 

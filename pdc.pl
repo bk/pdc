@@ -9,7 +9,7 @@ use File::Copy qw/copy move/;
 use Cwd qw/getcwd/;
 use Getopt::Long;
 
-my $VERSION = '0.7.1';
+my $VERSION = '0.7.2';
 
 #### PRELIMINARIES
 
@@ -23,7 +23,7 @@ my %pandoc_args = (
             incremental section-divs html-q-tags citeproc natbib biblatex
             mathml gladtex trace dump-args ignore-args verbose quiet
             fail-if-warnings embed-resources link-images
-            no-check-certificate
+            no-check-certificate lot list-of-tables lof list-of-figures
           / ],
 
     # These may be used as booleans but can also take an URL argument
